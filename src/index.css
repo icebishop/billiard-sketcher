@@ -1,0 +1,366 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap');
+
+/* ═══════════════════════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════════════════════ */
+:root {
+  --bg:          #07090f;
+  --bg-panel:    rgba(11, 16, 28, 0.96);
+  --bg-hover:    rgba(255, 255, 255, 0.055);
+  --bg-active:   rgba(14, 165, 233, 0.13);
+
+  --border:      rgba(255, 255, 255, 0.075);
+  --border-active: rgba(14, 165, 233, 0.55);
+
+  --text:        #e2e8f0;
+  --text-muted:  #64748b;
+  --text-subtle: #334155;
+
+  --sky:         #0ea5e9;
+  --sky-light:   #38bdf8;
+  --sky-glow:    rgba(14, 165, 233, 0.28);
+  --emerald:     #10b981;
+  --amber:       #f59e0b;
+  --red:         #ef4444;
+  --violet:      #8b5cf6;
+
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+
+  --font-ui:     'Inter', system-ui, sans-serif;
+  --font-head:   'Outfit', system-ui, sans-serif;
+
+  --toolbar-h:   52px;
+  --header-h:    54px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5 { font-family: var(--font-head); }
+
+/* ═══════════════════════════════════════════════════════════
+   GLASSMORPHISM PANEL
+═══════════════════════════════════════════════════════════ */
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HORIZONTAL TOOLBAR
+═══════════════════════════════════════════════════════════ */
+.toolbar-bar {
+  display: flex;
+  align-items: center;
+  height: var(--toolbar-h);
+  padding: 0 10px;
+  gap: 0;
+  background: rgba(8, 13, 26, 0.98);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  position: sticky;
+  top: var(--header-h);
+  z-index: 40;
+  flex-shrink: 0;
+}
+.toolbar-bar::-webkit-scrollbar { display: none; }
+
+/* Group of buttons */
+.tb-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Vertical separator */
+.tb-sep {
+  width: 1px;
+  height: 26px;
+  background: var(--border);
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
+/* ── Tool button (icon + tiny label) ── */
+.tb-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 46px;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.13s, background 0.13s, border-color 0.13s;
+  font-family: var(--font-ui);
+}
+.tb-tool:hover  { background: var(--bg-hover); color: var(--text); }
+.tb-tool.active {
+  background: var(--bg-active);
+  border-color: var(--border-active);
+  color: var(--sky-light);
+}
+.tb-tool-label {
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+/* ── Line style button ── */
+.tb-style {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.13s, background 0.13s, border-color 0.13s;
+}
+.tb-style:hover  { background: var(--bg-hover); color: var(--text); }
+.tb-style.active {
+  background: var(--bg-active);
+  border-color: var(--border-active);
+  color: var(--sky-light);
+}
+
+/* ── Color swatch ── */
+.tb-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.13s, box-shadow 0.13s;
+  flex-shrink: 0;
+}
+.tb-color:hover   { transform: scale(1.18); }
+.tb-color.active  {
+  border-color: white;
+  transform: scale(1.18);
+  box-shadow: 0 0 0 2px var(--border-active);
+}
+
+/* ── Custom color picker ── */
+.tb-color-picker {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255,255,255,0.25);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: border-color 0.13s;
+}
+.tb-color-picker:hover { border-color: rgba(255,255,255,0.55); }
+
+/* ── Finish line button ── */
+.tb-finish {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  animation: pulse-ring 2.2s cubic-bezier(0.4,0,0.6,1) infinite;
+  font-family: var(--font-ui);
+}
+.tb-finish:hover { background: rgba(16,185,129,0.22); border-color: rgba(16,185,129,0.7); }
+
+/* ── Delete line button ── */
+.tb-delete {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-ui);
+}
+.tb-delete:hover { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.6); }
+
+/* ── Ghost button ── */
+.tb-ghost {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-ui);
+}
+.tb-ghost:hover { background: var(--bg-hover); color: var(--text); border-color: rgba(255,255,255,0.15); }
+
+/* ── Primary export button ── */
+.tb-primary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: linear-gradient(135deg, var(--sky) 0%, #0369a1 100%);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(14,165,233,0.32);
+  font-family: var(--font-ui);
+  white-space: nowrap;
+}
+.tb-primary:hover {
+  background: linear-gradient(135deg, var(--sky-light) 0%, var(--sky) 100%);
+  box-shadow: 0 4px 14px rgba(14,165,233,0.45);
+  transform: translateY(-1px);
+}
+
+/* ── Thickness label ── */
+.tb-label {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.tb-value {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--sky-light);
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR PANEL BUTTONS (legacy + new)
+═══════════════════════════════════════════════════════════ */
+.btn-primary {
+  background: linear-gradient(135deg, var(--sky), #0284c7);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px var(--sky-glow);
+  font-family: var(--font-ui);
+}
+.btn-primary:hover { background: linear-gradient(135deg, #0891b2, #0369a1); transform: translateY(-1px); }
+
+.btn-secondary {
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  font-family: var(--font-ui);
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+
+.btn-danger {
+  background: rgba(239,68,68,0.12);
+  color: #fca5a5;
+  border: 1px solid rgba(239,68,68,0.3);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  font-family: var(--font-ui);
+}
+.btn-danger:hover { background: rgba(239,68,68,0.22); color: #fff; }
+
+/* ═══════════════════════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════════════════════ */
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.45); }
+  50%       { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateX(6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.fade-in { animation: fade-in 0.18s ease; }
+
+/* ═══════════════════════════════════════════════════════════
+   CUSTOM SCROLLBAR
+═══════════════════════════════════════════════════════════ */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.14); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); }
