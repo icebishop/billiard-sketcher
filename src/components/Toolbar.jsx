@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Move, PenTool, ArrowUpRight, Type, Eraser,
   Download, RotateCcw, CheckCircle, Trash2,
+  Film, Camera, Clock,
 } from 'lucide-react';
 
 /* ── Preset color palette ── */
@@ -48,6 +49,12 @@ export default function Toolbar({
   onDropSelectedLine,
   selectedLine,
   onUpdateLine,
+  movieMode,
+  onToggleMovieMode,
+  frameSeconds,
+  onFrameSecondsChange,
+  onAddFrame,
+  frameCount,
 }) {
   const tools = [
     { id: 'move',   label: 'Mover',  icon: Move,         shortcut: 'V' },
@@ -210,6 +217,73 @@ export default function Toolbar({
             )}
           </div>
         </>
+      )}
+
+      {/* ── Section: Movie / Animation ── */}
+      <Sep />
+      <div className="tb-group">
+        <button
+          id="btn-movie-mode"
+          onClick={onToggleMovieMode}
+          title="Modo Película — captura fotogramas para animar la jugada"
+          className={`tb-tool${movieMode ? ' active' : ''}`}
+          style={{ minWidth: 52 }}
+        >
+          <Film size={15} strokeWidth={2.1} />
+          <span className="tb-tool-label">Película</span>
+        </button>
+      </div>
+
+      {movieMode && (
+        <div className="fade-in" style={{ display: 'contents' }}>
+          <div className="tb-group" style={{ gap: 8 }}>
+            <button
+              id="btn-add-frame"
+              onClick={onAddFrame}
+              className="tb-finish"
+              style={{ animation: 'none', borderColor: 'rgba(245,158,11,0.5)', background: 'rgba(245,158,11,0.12)', color: 'var(--amber)' }}
+              title="Añadir la vista actual como fotograma de la película"
+            >
+              <Camera size={14} strokeWidth={2.2} />
+              Añadir toma
+            </button>
+
+            <span className="tb-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Clock size={12} />
+              Tiempo
+            </span>
+            <input
+              id="frame-seconds"
+              type="number"
+              min={0.1}
+              step={0.1}
+              value={frameSeconds}
+              onChange={(e) => onFrameSecondsChange(e.target.value)}
+              title="Duración de exposición del fotograma (segundos)"
+              style={{
+                width: 54,
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--text)',
+                fontSize: 12,
+                padding: '5px 6px',
+                fontFamily: "'SF Mono', monospace",
+              }}
+            />
+            <span className="tb-value" style={{ minWidth: 12 }}>s</span>
+
+            {frameCount > 0 && (
+              <span
+                className="tb-value"
+                style={{ marginLeft: 4 }}
+                title="Fotogramas capturados"
+              >
+                {frameCount} 🎞
+              </span>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── Spacer ── */}

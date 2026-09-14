@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import TableCanvas from './components/TableCanvas';
 import Toolbar from './components/Toolbar';
+import MoviePanel from './components/MoviePanel';
+import { exportMovieWebM } from './utils/movieExport';
 import { Target, Palette, Layers, Info } from 'lucide-react';
 
 export default function App() {
@@ -23,6 +25,38 @@ export default function App() {
   const handleDownloadPNG = () => { const fn = exportHandlerRef.current?.(); fn?.(); };
   const handleResetTable  = () => {
     if (window.confirm('¿Reiniciar mesa y limpiar todos los dibujos?')) window.location.reload();
+  };
+
+  /* ── Movie / animation state ── */
+  const captureHandlerRef = useRef(null);
+  const handleRegisterCaptureHandler = (getter) => { captureHandlerRef.current = getter; };
+
+  const [movieMode, setMovieMode]       = useState(false);
+  const [frameSeconds, setFrameSeconds] = useState('1');
+  const [frames, setFrames]             = useState([]); // { id, dataUrl, width, height, seconds }
+
+  const handleAddFrame = () => {
+    const fn = captureHandlerRef.current?.();
+    const snap = fn?.();
+    if (!snap) return;
+    const seconds = Math.max(0.1, Number(frameSeconds) || 1);
+    setFrames(prev => [
+      ...prev,
+      { id: `frame-${Date.now()}`, dataUrl: snap.dataUrl, width: snap.width, height: snap.height, seconds },
+    ]);
+  };
+
+  const handleRemoveFrame = (id) =>
+    setFrames(prev => prev.filter(f => f.id !== id));
+
+  const handleUpdateFrameTime = (id, value) => {
+    const seconds = Math.max(0.1, Number(value) || 0.1);
+    setFrames(prev => prev.map(f => (f.id === id ? { ...f, seconds } : f)));
+  };
+
+  const handleSaveMovie = async () => {
+    if (frames.length === 0) return;
+    await exportMovieWebM(frames);
   };
 
   const clothOptions = [
@@ -126,6 +160,12 @@ export default function App() {
         onDropSelectedLine={lineState.dropSelectedLine}
         selectedLine={lineState.selectedLine}
         onUpdateLine={lineState.updateSelectedLine ?? (() => {})}
+        movieMode={movieMode}
+        onToggleMovieMode={() => setMovieMode(m => !m)}
+        frameSeconds={frameSeconds}
+        onFrameSecondsChange={setFrameSeconds}
+        onAddFrame={handleAddFrame}
+        frameCount={frames.length}
       />
 
       {/* ══════════════════════════════════════════════
@@ -156,6 +196,7 @@ export default function App() {
             clothColor={clothColor}
             showDiamonds={showDiamonds}
             onRegisterExportHandler={handleRegisterExportHandler}
+            onRegisterCaptureHandler={handleRegisterCaptureHandler}
             onLineStateChange={setLineState}
           />
         </div>
@@ -246,6 +287,14 @@ export default function App() {
               />
             </div>
           </div>
+
+          {/* ── 2. Movie / Animation ── */}
+          <MoviePanel
+            frames={frames}
+            onRemoveFrame={handleRemoveFrame}
+            onUpdateFrameTime={handleUpdateFrameTime}
+            onSaveMovie={handleSaveMovie}
+          />
 
           {/* ── 3. Quick Guide ── */}
           <div

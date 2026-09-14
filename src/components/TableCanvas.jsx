@@ -5,6 +5,7 @@ export default function TableCanvas({
   clothColor = '#0d5c3a',
   showDiamonds = true,
   onRegisterExportHandler,
+  onRegisterCaptureHandler,
   onLineStateChange
 }) {
   const canvasRef = useRef(null);
@@ -78,9 +79,15 @@ export default function TableCanvas({
     const marginY   = dimensions.height * 0.09;
     const playWidth  = dimensions.width  - marginX * 2;
     const playHeight = dimensions.height - marginY * 2;
+    // Normalized bounds that also cover the wooden bands (rails).
+    // 0..1 is the cloth; negative / >1 values fall on the bands.
+    const minNx = -marginX / playWidth;
+    const maxNx = 1 + marginX / playWidth;
+    const minNy = -marginY / playHeight;
+    const maxNy = 1 + marginY / playHeight;
     return {
-      nx: Math.max(0, Math.min(1, (px - marginX) / playWidth)),
-      ny: Math.max(0, Math.min(1, (py - marginY) / playHeight)),
+      nx: Math.max(minNx, Math.min(maxNx, (px - marginX) / playWidth)),
+      ny: Math.max(minNy, Math.min(maxNy, (py - marginY) / playHeight)),
     };
   }, [dimensions]);
 
@@ -546,6 +553,23 @@ export default function TableCanvas({
   useEffect(() => {
     if (onRegisterExportHandler) onRegisterExportHandler(() => exportPNG);
   }, [onRegisterExportHandler, exportPNG]);
+
+  // ── Frame capture (for movie feature) ───────────────────────
+  const captureFrame = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    // Force a fresh render so the snapshot is up to date.
+    drawCanvas();
+    return {
+      dataUrl: canvas.toDataURL('image/png'),
+      width:   canvas.width,
+      height:  canvas.height,
+    };
+  }, [drawCanvas]);
+
+  useEffect(() => {
+    if (onRegisterCaptureHandler) onRegisterCaptureHandler(() => captureFrame);
+  }, [onRegisterCaptureHandler, captureFrame]);
 
   // ── Status hint text ─────────────────────────────────────────
   let hintText = 'Selecciona "Línea Poligonal" para dibujar recorridos continuos.';
