@@ -2,13 +2,39 @@ import React, { useState, useRef } from 'react';
 import TableCanvas from './components/TableCanvas';
 import Toolbar from './components/Toolbar';
 import MoviePanel from './components/MoviePanel';
+import StrikePanel from './components/StrikePanel';
+import PointPanel from './components/PointPanel';
+import TextPanel from './components/TextPanel';
+import HDScreenshotModal from './components/HDScreenshotModal';
 import { exportMovieWebM } from './utils/movieExport';
-import { Target, Palette, Layers, Info } from 'lucide-react';
+import { Target, Palette, Layers, Info, Compass } from 'lucide-react';
 
 export default function App() {
-  const [activeTool, setActiveTool]     = useState('move');
-  const [clothColor, setClothColor]     = useState('#0d5c3a');
-  const [showDiamonds, setShowDiamonds] = useState(true);
+  const [activeTool, setActiveTool]           = useState('move');
+  const [clothColor, setClothColor]           = useState('#0d5c3a');
+  const [showDiamonds, setShowDiamonds]       = useState(true);
+  const [showAlignmentGuides, setShowAlignmentGuides] = useState(true);
+
+  /* Points state */
+  const [points, setPoints]                 = useState([]);
+  const [pointRadius, setPointRadius]       = useState(8);
+  const [pointColor, setPointColor]         = useState('#ef4444');
+  const [selectedPointId, setSelectedPointId] = useState(null);
+
+  /* Texts state */
+  const [texts, setTexts]                   = useState([]);
+  const [textColor, setTextColor]           = useState('#f59e0b');
+  const [selectedTextId, setSelectedTextId] = useState(null);
+
+  /* HD Screenshot Modal State */
+  const [isHDModalOpen, setIsHDModalOpen] = useState(false);
+
+  /* Tool switch handler — deselect active selections to avoid crosstalk */
+  const handleSelectTool = (tool) => {
+    setActiveTool(tool);
+    setSelectedPointId(null);
+    setSelectedTextId(null);
+  };
 
   /* Line state bridge: TableCanvas → App → Toolbar */
   const [lineState, setLineState] = useState({
@@ -23,6 +49,49 @@ export default function App() {
   const exportHandlerRef = useRef(null);
   const handleRegisterExportHandler = (getter) => { exportHandlerRef.current = getter; };
   const handleDownloadPNG = () => { const fn = exportHandlerRef.current?.(); fn?.(); };
+
+  /* ── JSON Import / Export handlers ── */
+  const jsonHandlerRef = useRef(null);
+  const handleRegisterJsonHandler = (getter) => { jsonHandlerRef.current = getter; };
+
+  const handleSaveJSON = () => {
+    const fn = jsonHandlerRef.current?.();
+    const data = fn?.getDiagramData();
+    if (!data) return;
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `billiard-diagram-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLoadJSON = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          const fn = jsonHandlerRef.current?.();
+          fn?.loadDiagramData(data);
+        } catch (err) {
+          alert('Error al leer el archivo JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
   const handleResetTable  = () => {
     if (window.confirm('¿Reiniciar mesa y limpiar todos los dibujos?')) window.location.reload();
   };
@@ -35,9 +104,20 @@ export default function App() {
   const [frameSeconds, setFrameSeconds] = useState('1');
   const [frames, setFrames]             = useState([]); // { id, dataUrl, width, height, seconds }
 
+  /* Movie text & watermark settings */
+  const [movieTitleText, setMovieTitleText]         = useState('Billiard Sketcher — Animación 3 Bandas');
+  const [movieShowHeader, setMovieShowHeader]       = useState(true);
+  const [movieShowWatermark, setMovieShowWatermark] = useState(true);
+  const [movieWatermarkText, setMovieWatermarkText] = useState('Billiard Sketcher • 3-Bandas HD');
+
   const handleAddFrame = () => {
     const fn = captureHandlerRef.current?.();
-    const snap = fn?.();
+    const snap = fn?.({
+      showHeader: movieShowHeader,
+      titleText: movieTitleText,
+      showWatermark: movieShowWatermark,
+      watermarkText: movieWatermarkText,
+    });
     if (!snap) return;
     const seconds = Math.max(0.1, Number(frameSeconds) || 1);
     setFrames(prev => [
@@ -54,10 +134,24 @@ export default function App() {
     setFrames(prev => prev.map(f => (f.id === id ? { ...f, seconds } : f)));
   };
 
+  const [isSavingMovie, setIsSavingMovie] = useState(false);
+
   const handleSaveMovie = async () => {
-    if (frames.length === 0) return;
-    await exportMovieWebM(frames);
+    if (frames.length === 0 || isSavingMovie) return;
+    setIsSavingMovie(true);
+    try {
+      await exportMovieWebM(frames);
+    } catch (err) {
+      console.error('Error exportando película:', err);
+    } finally {
+      setIsSavingMovie(false);
+    }
   };
+
+  /* ── Strike & Spin (Toma y Efecto) state ── */
+  const [strikeMode, setStrikeMode] = useState(true);
+  const [spin, setSpin]             = useState({ x: 0, y: 0 }); // english / efecto, -1..1
+  const [strike, setStrike]         = useState(-0.5);          // yellow A offset: -1 left .. 0 center .. +1 right
 
   const clothOptions = [
     { name: 'Verde',  hex: '#0d5c3a' },
@@ -122,7 +216,7 @@ export default function App() {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              BilliNote
+              Billiard Sketcher
             </h1>
             <p style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1 }}>
               Maestro del Billar — Diseñador 3 Bandas
@@ -151,9 +245,11 @@ export default function App() {
       ══════════════════════════════════════════════ */}
       <Toolbar
         activeTool={activeTool}
-        setActiveTool={setActiveTool}
+        setActiveTool={handleSelectTool}
         onDownloadPNG={handleDownloadPNG}
         onResetTable={handleResetTable}
+        onSaveJSON={handleSaveJSON}
+        onLoadJSON={handleLoadJSON}
         isDrawingLine={lineState.isDrawingLine}
         onFinishLine={lineState.finishLine}
         selectedLineId={lineState.selectedLineId}
@@ -166,6 +262,9 @@ export default function App() {
         onFrameSecondsChange={setFrameSeconds}
         onAddFrame={handleAddFrame}
         frameCount={frames.length}
+        strikeMode={strikeMode}
+        onToggleStrikeMode={() => setStrikeMode(m => !m)}
+        onOpenHDModal={() => setIsHDModalOpen(true)}
       />
 
       {/* ══════════════════════════════════════════════
@@ -182,6 +281,7 @@ export default function App() {
         {/* ── Canvas Area ── */}
         <div
           style={{
+            position: 'relative',
             flex: 1,
             display: 'flex',
             alignItems: 'center',
@@ -194,9 +294,32 @@ export default function App() {
           <TableCanvas
             activeTool={activeTool}
             clothColor={clothColor}
+            setClothColor={setClothColor}
             showDiamonds={showDiamonds}
+            setShowDiamonds={setShowDiamonds}
+            showAlignmentGuides={showAlignmentGuides}
+            setShowAlignmentGuides={setShowAlignmentGuides}
+            strikeMode={strikeMode}
+            setStrikeMode={setStrikeMode}
+            spin={spin}
+            setSpin={setSpin}
+            strike={strike}
+            setStrike={setStrike}
+            points={points}
+            setPoints={setPoints}
+            pointRadius={pointRadius}
+            pointColor={pointColor}
+            selectedPointId={selectedPointId}
+            setSelectedPointId={setSelectedPointId}
+            texts={texts}
+            setTexts={setTexts}
+            textColor={textColor}
+            setTextColor={setTextColor}
+            selectedTextId={selectedTextId}
+            setSelectedTextId={setSelectedTextId}
             onRegisterExportHandler={handleRegisterExportHandler}
             onRegisterCaptureHandler={handleRegisterCaptureHandler}
+            onRegisterJsonHandler={handleRegisterJsonHandler}
             onLineStateChange={setLineState}
           />
         </div>
@@ -286,17 +409,76 @@ export default function App() {
                 style={{ width: 15, height: 15, accentColor: 'var(--sky)', cursor: 'pointer' }}
               />
             </div>
+
+            {/* Alignment guides toggle */}
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                paddingTop: 8, borderTop: '1px solid var(--border)',
+              }}
+            >
+              <label
+                htmlFor="guides-toggle"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}
+              >
+                <Compass size={13} color="var(--sky-light)" />
+                Guías de alineación
+              </label>
+              <input
+                id="guides-toggle"
+                type="checkbox"
+                checked={showAlignmentGuides}
+                onChange={(e) => setShowAlignmentGuides(e.target.checked)}
+                style={{ width: 15, height: 15, accentColor: 'var(--sky)', cursor: 'pointer' }}
+              />
+            </div>
           </div>
 
-          {/* ── 2. Movie / Animation ── */}
+          {/* ── 2. Point Configuration Panel (Puntos) ── */}
+          <PointPanel
+            pointRadius={pointRadius}
+            setPointRadius={setPointRadius}
+            pointColor={pointColor}
+            setPointColor={setPointColor}
+            points={points}
+            setPoints={setPoints}
+            selectedPointId={selectedPointId}
+            setSelectedPointId={setSelectedPointId}
+            activeTool={activeTool}
+            setActiveTool={handleSelectTool}
+          />
+
+          {/* ── 3. Text Configuration Panel (Textos) ── */}
+          <TextPanel
+            textColor={textColor}
+            setTextColor={setTextColor}
+            texts={texts}
+            setTexts={setTexts}
+            selectedTextId={selectedTextId}
+            setSelectedTextId={setSelectedTextId}
+            activeTool={activeTool}
+            setActiveTool={handleSelectTool}
+          />
+
+          {/* ── 4. Movie / Animation ── */}
           <MoviePanel
             frames={frames}
             onRemoveFrame={handleRemoveFrame}
             onUpdateFrameTime={handleUpdateFrameTime}
             onSaveMovie={handleSaveMovie}
+            isSaving={isSavingMovie}
+            onAddFrame={handleAddFrame}
+            movieTitleText={movieTitleText}
+            onMovieTitleTextChange={setMovieTitleText}
+            movieShowHeader={movieShowHeader}
+            onMovieShowHeaderChange={setMovieShowHeader}
+            movieShowWatermark={movieShowWatermark}
+            onMovieShowWatermarkChange={setMovieShowWatermark}
+            movieWatermarkText={movieWatermarkText}
+            onMovieWatermarkTextChange={setMovieWatermarkText}
           />
 
-          {/* ── 3. Quick Guide ── */}
+          {/* ── 4. Quick Guide ── */}
           <div
             className="glass-panel"
             style={{
@@ -319,10 +501,11 @@ export default function App() {
             </h4>
             <ol style={{ paddingLeft: 14, display: 'flex', flexDirection: 'column', gap: 5 }}>
               {[
-                ['Mover', 'arrastra bolas o selecciona líneas'],
+                ['Mover', 'arrastra bolas, puntos o selecciona líneas'],
+                ['Punto', 'clic en cualquier lugar de la mesa (incluidas bandas)'],
                 ['Línea / Flecha', 'clic = vértice, doble clic = finalizar'],
                 ['Vértices azules', 'arrastra para mover puntos individuales'],
-                ['Supr', 'elimina la línea seleccionada'],
+                ['Supr', 'elimina la línea o punto seleccionado'],
                 ['Exportar PNG', 'guarda tu diagrama de jugada'],
               ].map(([bold, rest], i) => (
                 <li key={i} style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.45 }}>
@@ -350,7 +533,7 @@ export default function App() {
           flexShrink: 0,
         }}
       >
-        <span>BilliNote — Maestro del Billar · Diseñador de Jugadas de Tres Bandas</span>
+        <span>Billiard Sketcher — Maestro del Billar · Diseñador de Jugadas de Tres Bandas</span>
         <span
           style={{
             fontSize: 10,
@@ -361,6 +544,13 @@ export default function App() {
           CARAMBOLA 3C
         </span>
       </footer>
+
+      {/* HD Screenshot Modal */}
+      <HDScreenshotModal
+        isOpen={isHDModalOpen}
+        onClose={() => setIsHDModalOpen(false)}
+        getDiagramData={() => jsonHandlerRef.current?.()?.getDiagramData()}
+      />
     </div>
   );
 }

@@ -1,20 +1,78 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { renderDiagramToCanvas } from '../utils/hdRender';
+import StrikePanel from './StrikePanel';
+
+function drawRoundedRect(ctx, x, y, w, h, r = 0) {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+}
+
+function adjustColorBrightness(hex, percent) {
+  if (!hex || typeof hex !== 'string') return '#888888';
+  let num = parseInt(hex.replace('#', ''), 16);
+  if (isNaN(num)) return hex;
+  let r = (num >> 16) + percent;
+  let g = ((num >> 8) & 0x00FF) + percent;
+  let b = (num & 0x0000FF) + percent;
+  r = Math.min(255, Math.max(0, r));
+  g = Math.min(255, Math.max(0, g));
+  b = Math.min(255, Math.max(0, b));
+  return '#' + (b | (g << 8) | (r << 16)).toString(16).padStart(6, '0');
+}
 
 export default function TableCanvas({
   activeTool,
   clothColor = '#0d5c3a',
+  setClothColor = () => {},
   showDiamonds = true,
+  setShowDiamonds = () => {},
+  showAlignmentGuides = true,
+  setShowAlignmentGuides = () => {},
+  strikeMode = false,
+  setStrikeMode = () => {},
+  spin = { x: 0, y: 0 },
+  setSpin = () => {},
+  strike = -0.5,
+  setStrike = () => {},
+  points = [],
+  setPoints = () => { },
+  pointRadius = 8,
+  pointColor = '#ef4444',
+  selectedPointId = null,
+  setSelectedPointId = () => { },
+  texts: externalTexts,
+  setTexts: setExternalTexts,
+  textColor = '#f59e0b',
+  setTextColor = () => { },
+  selectedTextId = null,
+  setSelectedTextId = () => { },
   onRegisterExportHandler,
   onRegisterCaptureHandler,
+  onRegisterJsonHandler,
   onLineStateChange
 }) {
   const canvasRef = useRef(null);
+  const captureModeRef = useRef(false); // true only while baking a capture
+  const [activeGuides, setActiveGuides] = useState([]);
 
-  // ── Table State ──────────────────────────────────────────────
+  // ── Table Objects ────────────────────────────────────────────
   const [balls, setBalls] = useState({
-    white:  { x: 0.25, y: 0.75, label: '1' },
+    white: { x: 0.25, y: 0.75, label: '1' },
     yellow: { x: 0.25, y: 0.25, label: '2' },
-    red:    { x: 0.75, y: 0.5,  label: '3' },
+    red: { x: 0.75, y: 0.5, label: '3' },
   });
 
   const [lines, setLines] = useState([
@@ -22,9 +80,9 @@ export default function TableCanvas({
       id: 'default-line-1',
       points: [
         { x: 0.25, y: 0.75 },
-        { x: 0.5,  y: 0.05 },
-        { x: 0.95, y: 0.4  },
-        { x: 0.75, y: 0.5  },
+        { x: 0.5, y: 0.05 },
+        { x: 0.95, y: 0.4 },
+        { x: 0.75, y: 0.5 },
       ],
       color: '#06b6d4',
       style: 'solid',
@@ -33,14 +91,18 @@ export default function TableCanvas({
     },
   ]);
 
-  const [texts, setTexts] = useState([]);
+  const [internalTexts, setInternalTexts] = useState([]);
+  const texts = externalTexts !== undefined ? externalTexts : internalTexts;
+  const setTexts = setExternalTexts !== undefined ? setExternalTexts : setInternalTexts;
 
   // ── Interaction State ────────────────────────────────────────
-  const [draggingBall,    setDraggingBall]    = useState(null);
-  const [draggingVertex,  setDraggingVertex]  = useState(null); // { lineId, pointIndex }
+  const [draggingBall, setDraggingBall] = useState(null);
+  const [draggingVertex, setDraggingVertex] = useState(null); // { lineId, pointIndex }
+  const [draggingText, setDraggingText] = useState(null);
+  const [draggingPoint, setDraggingPoint] = useState(null);
   const [currentLinePoints, setCurrentLinePoints] = useState(null);
-  const [mousePreviewPoint,  setMousePreviewPoint]  = useState(null);
-  const [selectedLineId,  setSelectedLineId]  = useState(null);
+  const [mousePreviewPoint, setMousePreviewPoint] = useState(null);
+  const [selectedLineId, setSelectedLineId] = useState(null);
 
   // ── Canvas size ──────────────────────────────────────────────
   const [dimensions, setDimensions] = useState({ width: 900, height: 450 });
@@ -50,7 +112,7 @@ export default function TableCanvas({
       const parent = canvasRef.current?.parentElement;
       if (parent) {
         const pWidth = parent.clientWidth - 16;
-        const width  = Math.min(Math.max(pWidth, 320), 1200);
+        const width = Math.min(Math.max(pWidth, 320), 1200);
         const height = width / 2;
         setDimensions({ width, height });
       }
@@ -62,9 +124,9 @@ export default function TableCanvas({
 
   // ── Coordinate Helpers ───────────────────────────────────────
   const normToPx = useCallback((nx, ny) => {
-    const marginX   = dimensions.width  * 0.045;
-    const marginY   = dimensions.height * 0.09;
-    const playWidth  = dimensions.width  - marginX * 2;
+    const marginX = dimensions.width * 0.045;
+    const marginY = dimensions.height * 0.09;
+    const playWidth = dimensions.width - marginX * 2;
     const playHeight = dimensions.height - marginY * 2;
     const ballRadius = Math.max(6, playWidth * (30.75 / 2840));
     return {
@@ -75,9 +137,9 @@ export default function TableCanvas({
   }, [dimensions]);
 
   const pxToNorm = useCallback((px, py) => {
-    const marginX   = dimensions.width  * 0.045;
-    const marginY   = dimensions.height * 0.09;
-    const playWidth  = dimensions.width  - marginX * 2;
+    const marginX = dimensions.width * 0.045;
+    const marginY = dimensions.height * 0.09;
+    const playWidth = dimensions.width - marginX * 2;
     const playHeight = dimensions.height - marginY * 2;
     // Normalized bounds that also cover the wooden bands (rails).
     // 0..1 is the cloth; negative / >1 values fall on the bands.
@@ -91,16 +153,93 @@ export default function TableCanvas({
     };
   }, [dimensions]);
 
+  // ── Visual Alignment Guide Helper (Magnet effect for Points & Text) ────────
+  const getSnapGuides = useCallback((nx, ny, activeId = null) => {
+    if (!showAlignmentGuides) return { snappedNx: nx, snappedNy: ny, guides: [] };
+
+    const currPx = normToPx(nx, ny);
+    const SNAP_THRESHOLD_PX = 8;
+
+    const targets = [];
+
+    // 1. Diamond alignment targets
+    for (let i = 0; i <= 8; i++) {
+      targets.push({ id: `d-top-${i}`, x: i / 8, y: 0 });
+      targets.push({ id: `d-bot-${i}`, x: i / 8, y: 1 });
+    }
+    for (let j = 0; j <= 4; j++) {
+      targets.push({ id: `d-left-${j}`, x: 0, y: j / 4 });
+      targets.push({ id: `d-right-${j}`, x: 1, y: j / 4 });
+    }
+
+    // 2. Points (excluding current point being moved)
+    (points || []).forEach(p => {
+      if (p.id !== activeId) {
+        targets.push({ id: p.id, x: p.x, y: p.y });
+      }
+    });
+
+    // 3. Texts (excluding current text being moved)
+    (texts || []).forEach(t => {
+      if (t.id !== activeId) {
+        targets.push({ id: t.id, x: t.x, y: t.y });
+      }
+    });
+
+    // Note: Balls are deliberately excluded so magnet snapping ONLY applies between points, text & diamond marks.
+
+    const guides = [];
+    let minDiffX = SNAP_THRESHOLD_PX;
+    let bestTgtX = null;
+    let minDiffY = SNAP_THRESHOLD_PX;
+    let bestTgtY = null;
+
+    targets.forEach(t => {
+      const tgtPx = normToPx(t.x, t.y);
+      const diffX = Math.abs(currPx.x - tgtPx.x);
+      if (diffX < minDiffX) {
+        minDiffX = diffX;
+        bestTgtX = { x: t.x, px: tgtPx.x };
+      }
+      const diffY = Math.abs(currPx.y - tgtPx.y);
+      if (diffY < minDiffY) {
+        minDiffY = diffY;
+        bestTgtY = { y: t.y, py: tgtPx.y };
+      }
+    });
+
+    let snappedNx = nx;
+    let snappedNy = ny;
+
+    if (bestTgtX) {
+      snappedNx = bestTgtX.x;
+    }
+    if (bestTgtY) {
+      snappedNy = bestTgtY.y;
+    }
+
+    const finalPx = normToPx(snappedNx, snappedNy);
+
+    if (bestTgtX) {
+      guides.push({ axis: 'x', px: bestTgtX.px, py: finalPx.y });
+    }
+    if (bestTgtY) {
+      guides.push({ axis: 'y', px: finalPx.x, py: bestTgtY.py });
+    }
+
+    return { snappedNx, snappedNy, guides };
+  }, [showAlignmentGuides, points, texts, normToPx]);
+
   // ── Line Actions ─────────────────────────────────────────────
   const finishCurrentLine = useCallback(() => {
     if (currentLinePoints && currentLinePoints.length >= 2) {
-      const color   = activeTool === 'arrow' ? '#f59e0b' : '#06b6d4';
+      const color = activeTool === 'arrow' ? '#f59e0b' : '#06b6d4';
       const newLine = {
-        id:      `line-${Date.now()}`,
-        points:  [...currentLinePoints],
+        id: `line-${Date.now()}`,
+        points: [...currentLinePoints],
         color,
-        style:   'solid',
-        width:   2,
+        style: 'solid',
+        width: 2,
         isArrow: activeTool === 'arrow',
       };
       setLines(prev => [...prev, newLine]);
@@ -126,12 +265,12 @@ export default function TableCanvas({
   useEffect(() => {
     if (onLineStateChange) {
       onLineStateChange({
-        isDrawingLine:    !!(currentLinePoints && currentLinePoints.length >= 1),
-        finishLine:       finishCurrentLine,
+        isDrawingLine: !!(currentLinePoints && currentLinePoints.length >= 1),
+        finishLine: finishCurrentLine,
         selectedLineId,
         dropSelectedLine,
         updateSelectedLine,
-        selectedLine:     lines.find(l => l.id === selectedLineId) || null,
+        selectedLine: lines.find(l => l.id === selectedLineId) || null,
       });
     }
   }, [currentLinePoints, selectedLineId, finishCurrentLine, dropSelectedLine, updateSelectedLine, onLineStateChange, lines]);
@@ -145,9 +284,9 @@ export default function TableCanvas({
 
     ctx.clearRect(0, 0, width, height);
 
-    const marginX    = width  * 0.045;
-    const marginY    = height * 0.09;
-    const playWidth  = width  - marginX * 2;
+    const marginX = width * 0.045;
+    const marginY = height * 0.09;
+    const playWidth = width - marginX * 2;
     const playHeight = height - marginY * 2;
     const ballRadius = Math.max(6, playWidth * (30.75 / 2840));
 
@@ -163,7 +302,7 @@ export default function TableCanvas({
     ctx.fillStyle = clothColor;
     ctx.fillRect(marginX, marginY, playWidth, playHeight);
     ctx.strokeStyle = '#052b1b';
-    ctx.lineWidth   = Math.max(2, playWidth * 0.005);
+    ctx.lineWidth = Math.max(2, playWidth * 0.005);
     ctx.setLineDash([]);
     ctx.strokeRect(marginX, marginY, playWidth, playHeight);
 
@@ -177,9 +316,9 @@ export default function TableCanvas({
     // 3. Diamond markers
     if (showDiamonds) {
       const dr = Math.max(3, playWidth * 0.004);
-      ctx.fillStyle   = '#f8fafc';
+      ctx.fillStyle = '#f8fafc';
       ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth   = 1;
+      ctx.lineWidth = 1;
       const drawDiamond = (cx, cy) => {
         ctx.beginPath();
         ctx.moveTo(cx, cy - dr);
@@ -201,7 +340,20 @@ export default function TableCanvas({
     }
 
     // 4. Draw polygonal lines
-    lines.forEach((line) => {
+    // Include both finalized lines and any active line currently in progress (with >= 2 points) during capture
+    const linesToDraw = [...lines];
+    if (captureModeRef.current && currentLinePoints && currentLinePoints.length >= 2) {
+      linesToDraw.push({
+        id: '__in_progress__',
+        points: currentLinePoints,
+        color: activeTool === 'arrow' ? '#f59e0b' : '#06b6d4',
+        style: 'solid',
+        width: 2,
+        isArrow: activeTool === 'arrow',
+      });
+    }
+
+    linesToDraw.forEach((line) => {
       if (!line.points || line.points.length < 2) return;
       const isSelected = line.id === selectedLineId;
       const lw = line.width || 2;
@@ -212,12 +364,15 @@ export default function TableCanvas({
         else ctx.setLineDash([]);
       };
 
+      // During capture, treat every line as unselected (no editing UI).
+      const showSelection = isSelected && !captureModeRef.current;
+
       // Selection glow (no dash for the glow)
-      if (isSelected) {
+      if (showSelection) {
         const g0 = normToPx(line.points[0].x, line.points[0].y);
         ctx.beginPath();
         ctx.strokeStyle = 'rgba(56,189,248,0.30)';
-        ctx.lineWidth   = lw + 8;
+        ctx.lineWidth = lw + 8;
         ctx.setLineDash([]);
         ctx.moveTo(g0.x, g0.y);
         for (let i = 1; i < line.points.length; i++) {
@@ -231,8 +386,8 @@ export default function TableCanvas({
       applyDash();
       const p0 = normToPx(line.points[0].x, line.points[0].y);
       ctx.beginPath();
-      ctx.strokeStyle = isSelected ? '#38bdf8' : (line.color || '#06b6d4');
-      ctx.lineWidth   = lw;
+      ctx.strokeStyle = showSelection ? '#38bdf8' : (line.color || '#06b6d4');
+      ctx.lineWidth = lw;
       ctx.moveTo(p0.x, p0.y);
       for (let i = 1; i < line.points.length; i++) {
         const pt = normToPx(line.points[i].x, line.points[i].y);
@@ -246,8 +401,8 @@ export default function TableCanvas({
         const last = normToPx(line.points[line.points.length - 1].x, line.points[line.points.length - 1].y);
         const prev = normToPx(line.points[line.points.length - 2].x, line.points[line.points.length - 2].y);
         const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-        const al    = Math.max(10, playWidth * 0.013) + lw;
-        ctx.fillStyle = isSelected ? '#38bdf8' : (line.color || '#06b6d4');
+        const al = Math.max(10, playWidth * 0.013) + lw;
+        ctx.fillStyle = showSelection ? '#38bdf8' : (line.color || '#06b6d4');
         ctx.beginPath();
         ctx.moveTo(last.x, last.y);
         ctx.lineTo(last.x - al * Math.cos(angle - Math.PI / 6), last.y - al * Math.sin(angle - Math.PI / 6));
@@ -256,8 +411,8 @@ export default function TableCanvas({
         ctx.fill();
       }
 
-      // Vertex handles (only for selected line)
-      if (isSelected) {
+      // Vertex handles (only for selected line, never during capture)
+      if (showSelection) {
         line.points.forEach((ptNorm, idx) => {
           const pt = normToPx(ptNorm.x, ptNorm.y);
           const isDraggingThis = draggingVertex &&
@@ -274,30 +429,30 @@ export default function TableCanvas({
           // Main handle
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
-          ctx.fillStyle   = isDraggingThis ? '#ffffff' : '#38bdf8';
+          ctx.fillStyle = isDraggingThis ? '#ffffff' : '#38bdf8';
           ctx.strokeStyle = isDraggingThis ? '#06b6d4' : '#ffffff';
-          ctx.lineWidth   = 2;
+          ctx.lineWidth = 2;
           ctx.fill();
           ctx.stroke();
 
           // Index label inside handle
-          ctx.fillStyle    = isDraggingThis ? '#06b6d4' : '#0f172a';
-          ctx.font         = `700 ${Math.round(r * 1.1)}px Inter, sans-serif`;
-          ctx.textAlign    = 'center';
+          ctx.fillStyle = isDraggingThis ? '#06b6d4' : '#0f172a';
+          ctx.font = `700 ${Math.round(r * 1.1)}px Inter, sans-serif`;
+          ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(String(idx + 1), pt.x, pt.y);
         });
       }
     });
 
-    // 5. Active drawing preview
-    if (currentLinePoints && currentLinePoints.length >= 1) {
+    // 5. Active drawing preview (editing only — skipped during capture since linesToDraw renders it)
+    if (currentLinePoints && currentLinePoints.length >= 1 && !captureModeRef.current) {
       const activePts = [...currentLinePoints];
       if (mousePreviewPoint) activePts.push(mousePreviewPoint);
 
       ctx.beginPath();
       ctx.strokeStyle = activeTool === 'arrow' ? '#f59e0b' : '#06b6d4';
-      ctx.lineWidth   = 2;
+      ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       const a0 = normToPx(activePts[0].x, activePts[0].y);
       ctx.moveTo(a0.x, a0.y);
@@ -317,34 +472,124 @@ export default function TableCanvas({
       });
     }
 
-    // 6. Text annotations
+    // 5.5 Points placed over table (including cloth & wooden bands/rails)
+    (points || []).forEach((ptNorm) => {
+      const pt = normToPx(ptNorm.x, ptNorm.y);
+      const baseR = ptNorm.radius || pointRadius || 8;
+      const radius = Math.max(2, baseR * (playWidth / 819));
+      const isSelected = ptNorm.id === selectedPointId && !captureModeRef.current;
+      const col = ptNorm.color || pointColor || '#ef4444';
+
+      ctx.save();
+
+      // Selection glow ring
+      if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, radius + 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, radius + 2.5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      // Shadow for 3D dot effect
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = Math.max(2, radius * 0.4);
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 2;
+
+      // Radial gradient dot
+      const grad = ctx.createRadialGradient(
+        pt.x - radius * 0.3, pt.y - radius * 0.3, radius * 0.08,
+        pt.x, pt.y, radius
+      );
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.35, col);
+      grad.addColorStop(1, adjustColorBrightness(col, -40));
+
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      ctx.lineWidth = Math.max(1, radius * 0.15);
+      ctx.strokeStyle = isSelected ? '#38bdf8' : 'rgba(255, 255, 255, 0.75)';
+      ctx.stroke();
+
+      ctx.restore();
+    });
+
+    // Preview for point tool
+    if (activeTool === 'point' && mousePreviewPoint && !captureModeRef.current) {
+      const pt = normToPx(mousePreviewPoint.x, mousePreviewPoint.y);
+      const radius = Math.max(2, (pointRadius || 8) * (playWidth / 819));
+      const col = pointColor || '#ef4444';
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.globalAlpha = 0.55;
+      ctx.fill();
+
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.globalAlpha = 0.9;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // 6. Text annotations (direct clean text with NO background color box)
     texts.forEach((t) => {
       const pt       = normToPx(t.x, t.y);
-      const fontSize = Math.max(11, Math.round(playWidth * 0.014));
-      ctx.font       = `600 ${fontSize}px Inter, sans-serif`;
-      ctx.setLineDash([]);
+      const fontSize = Math.max(12, Math.round(playWidth * 0.015));
+      const isSelected = t.id === selectedTextId && !captureModeRef.current;
+      const col = t.color || textColor || '#f59e0b';
+
+      ctx.save();
+      ctx.font = `700 ${fontSize}px Inter, sans-serif`;
       const metrics = ctx.measureText(t.text);
-      const bgW = metrics.width + 12;
-      const bgH = fontSize + 8;
-      ctx.fillStyle   = 'rgba(15,23,42,0.85)';
-      ctx.strokeStyle = t.color || 'rgba(255,255,255,0.3)';
-      ctx.lineWidth   = 1;
-      ctx.beginPath();
-      ctx.roundRect(pt.x - bgW / 2, pt.y - bgH / 2, bgW, bgH, 4);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle    = t.color || '#ffffff';
+      const bgW = metrics.width + 10;
+      const bgH = fontSize + 6;
+
+      // Selection outline ring when text is selected (dashed stroke only, NO background fill!)
+      if (isSelected) {
+        ctx.beginPath();
+        drawRoundedRect(ctx, pt.x - bgW / 2, pt.y - bgH / 2, bgW, bgH, 4);
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Subtle text shadow for high contrast without adding any background box color
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+      ctx.shadowBlur = 3;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
+
+      // Text content
+      ctx.fillStyle    = col;
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(t.text, pt.x, pt.y);
+      ctx.restore();
     });
 
     // 7. Balls
     const ballKeys = ['white', 'yellow', 'red'];
     ballKeys.forEach((key) => {
-      const b  = balls[key];
+      const b = balls[key];
       const pt = normToPx(b.x, b.y);
-      const r  = ballRadius;
+      const r = ballRadius;
 
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
@@ -365,32 +610,187 @@ export default function TableCanvas({
         grad.addColorStop(0.6, '#dc2626');
         grad.addColorStop(1, '#7f1d1d');
       }
-      ctx.fillStyle    = grad;
-      ctx.shadowColor  = 'rgba(0,0,0,0.5)';
-      ctx.shadowBlur   = Math.max(3, r * 0.4);
+      ctx.fillStyle = grad;
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = Math.max(3, r * 0.4);
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 3;
       ctx.fill();
 
       ctx.shadowColor = 'transparent';
-      ctx.lineWidth   = 1.2;
+      ctx.lineWidth = 1.2;
       ctx.strokeStyle = key === 'white' ? '#cbd5e1' : key === 'yellow' ? '#eab308' : '#991b1b';
       ctx.stroke();
 
       if (r >= 8) {
-        ctx.fillStyle    = key === 'white' ? '#0f172a' : key === 'yellow' ? '#0f172a' : '#ffffff';
-        ctx.font         = `700 ${Math.round(r * 0.95)}px Inter, sans-serif`;
-        ctx.textAlign    = 'center';
+        ctx.fillStyle = key === 'white' ? '#0f172a' : key === 'yellow' ? '#0f172a' : '#ffffff';
+        ctx.font = `700 ${Math.round(r * 0.95)}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(b.label, pt.x, pt.y);
       }
 
     });
 
-    // (spin indicator removed)
-  }, [dimensions, clothColor, showDiamonds, balls, lines, texts,
-      currentLinePoints, mousePreviewPoint,
-      selectedLineId, activeTool, normToPx, draggingVertex]);
+    // 8. Strike & Spin widget (Toma y Efecto) — baked onto the canvas at
+    //    capture time so it appears in PNG exports and movie screenshots.
+    //    On the live canvas the interactive HTML StrikePanel is shown
+    //    instead, so we only draw here while capturing.
+    if (strikeMode && captureModeRef.current) {
+      const cardW = Math.min(260, playWidth * 0.34);
+      const cardH = cardW * (128 / 260);
+      const cardX = marginX + playWidth - cardW - 12;
+      const cardY = marginY + playHeight - cardH - 12;
+      const rad = 12;
+
+      ctx.save();
+
+      // Card background (table cloth color) with dark border + inner shade
+      drawRoundedRect(ctx, cardX, cardY, cardW, cardH, rad);
+      ctx.fillStyle = clothColor;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.stroke();
+
+      // Clip to the card for inner content
+      ctx.save();
+      drawRoundedRect(ctx, cardX, cardY, cardW, cardH, rad);
+      ctx.clip();
+
+      // Fullness fraction label
+      const fullness = Math.max(0, 1 - Math.abs(strike));
+      const fraction =
+        fullness >= 0.94 ? '1/1' :
+          fullness >= 0.80 ? '7/8' :
+            fullness >= 0.68 ? '3/4' :
+              fullness >= 0.56 ? '5/8' :
+                fullness >= 0.44 ? '1/2' :
+                  fullness >= 0.31 ? '3/8' :
+                    fullness >= 0.19 ? '1/4' :
+                      fullness >= 0.07 ? '1/8' : '0';
+
+      const headerH = 20;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.font = '700 9px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText('TOMA / EFECTO', cardX + 8, cardY + headerH / 2 + 1);
+
+      // Fraction badge
+      const badgeText = fraction;
+      ctx.font = '800 11px monospace';
+      const bw = ctx.measureText(badgeText).width + 12;
+      const bx = cardX + 8 + ctx.measureText('TOMA / EFECTO').width * (9 / 11) + 12;
+      ctx.font = '700 9px Inter, sans-serif';
+      const labelW = ctx.measureText('TOMA / EFECTO').width;
+      const badgeX = cardX + 8 + labelW + 8;
+      const badgeY = cardY + 3;
+      const badgeH = 15;
+      drawRoundedRect(ctx, badgeX, badgeY, bw, badgeH, 5);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fill();
+      ctx.fillStyle = '#fde68a';
+      ctx.font = '800 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(badgeText, badgeX + bw / 2, badgeY + badgeH / 2 + 1);
+      void bx;
+
+      // Stage geometry
+      const stageTop = cardY + headerH;
+      const stageH = cardH - headerH;
+      const cx = cardX + cardW / 2;
+      const cy = stageTop + stageH / 2;
+      const ballR = Math.min(cardH * 0.24, cardW * 0.12);
+      const shiftX = strike * (ballR * 2); // ±1 → tangent (one diameter)
+
+      // Center reference line
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, stageTop + 12);
+      ctx.lineTo(cx, stageTop + stageH - 12);
+      ctx.stroke();
+
+      const drawWidgetBall = (bx2, by2, grad0, grad1, grad2, borderCol, label, labelCol) => {
+        ctx.globalAlpha = 0.6;
+        const g = ctx.createRadialGradient(bx2 - ballR * 0.3, by2 - ballR * 0.3, ballR * 0.1, bx2, by2, ballR);
+        g.addColorStop(0, grad0);
+        g.addColorStop(0.58, grad1);
+        g.addColorStop(1, grad2);
+        ctx.beginPath();
+        ctx.arc(bx2, by2, ballR, 0, Math.PI * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = borderCol;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = labelCol;
+        ctx.font = `700 ${Math.round(ballR * 0.55)}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, bx2, by2);
+      };
+
+      // Yellow "2" (object ball) — offset horizontally, drawn under
+      drawWidgetBall(cx + shiftX, cy, '#fde68a', '#f5c518', '#c98a04', 'rgba(202,138,4,0.85)', '2', '#78350f');
+
+      // White "1" (cue ball) — fixed center, on top, holds spin marker
+      drawWidgetBall(cx, cy, '#ffffff', '#dfe6ee', '#9aa7b6', 'rgba(203,213,225,0.75)', '1', '#475569');
+
+      // Spin / tip contact marker on the white ball
+      const mkX = cx + spin.x * ballR * 0.8;
+      const mkY = cy - spin.y * ballR * 0.8;
+      ctx.beginPath();
+      ctx.arc(mkX, mkY, Math.max(3, ballR * 0.16), 0, Math.PI * 2);
+      ctx.fillStyle = '#dc2626';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      ctx.restore(); // clip
+      ctx.restore(); // save
+    }
+
+    // 7.5 Alignment Guides (vertical & horizontal snap lines)
+    if (showAlignmentGuides && activeGuides && activeGuides.length > 0 && !captureModeRef.current) {
+      ctx.save();
+      ctx.setLineDash([4, 3]);
+      ctx.lineWidth = 1.2;
+
+      activeGuides.forEach((g) => {
+        ctx.beginPath();
+        if (g.axis === 'x') {
+          ctx.strokeStyle = '#38bdf8';
+          ctx.moveTo(g.px, 0);
+          ctx.lineTo(g.px, height);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(g.px, g.py, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fill();
+        } else if (g.axis === 'y') {
+          ctx.strokeStyle = '#38bdf8';
+          ctx.moveTo(0, g.py);
+          ctx.lineTo(width, g.py);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(g.px, g.py, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fill();
+        }
+      });
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }, [dimensions, clothColor, showDiamonds, showAlignmentGuides, activeGuides, balls, lines, texts, points, pointRadius, pointColor, selectedPointId, selectedTextId,
+    currentLinePoints, mousePreviewPoint,
+    selectedLineId, activeTool, normToPx, draggingVertex,
+    strikeMode, spin, strike]);
 
   useEffect(() => { drawCanvas(); }, [drawCanvas]);
 
@@ -399,9 +799,26 @@ export default function TableCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const px   = e.clientX - rect.left;
-    const py   = e.clientY - rect.top;
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
     const { nx, ny } = pxToNorm(px, py);
+
+    // ── Point tool ──
+    if (activeTool === 'point') {
+      const { snappedNx, snappedNy } = getSnapGuides(nx, ny, null);
+      const newPoint = {
+        id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        x: snappedNx,
+        y: snappedNy,
+        radius: pointRadius,
+        color: pointColor,
+      };
+      setPoints(prev => [...prev, newPoint]);
+      setSelectedPointId(newPoint.id);
+      setSelectedLineId(null);
+      setSelectedTextId(null);
+      return;
+    }
 
     // ── Move tool ──
     if (activeTool === 'move') {
@@ -419,12 +836,39 @@ export default function TableCanvas({
         }
       }
 
-      // Priority 2: balls
+      // Priority 1.5: points placed on table or bands
+      for (const p of points) {
+        const ppt = normToPx(p.x, p.y);
+        const pr = Math.max(10, (p.radius || pointRadius || 8) * (dimensions.width / 900) + 4);
+        if (Math.hypot(px - ppt.x, py - ppt.y) <= pr) {
+          setDraggingPoint(p.id);
+          setSelectedPointId(p.id);
+          setSelectedLineId(null);
+          setSelectedTextId(null);
+          return;
+        }
+      }
+
+      // Priority 2: text annotations
+      for (const t of texts) {
+        const tpt = normToPx(t.x, t.y);
+        if (Math.hypot(px - tpt.x, py - tpt.y) <= 24) {
+          setDraggingText(t.id);
+          setSelectedTextId(t.id);
+          setSelectedLineId(null);
+          setSelectedPointId(null);
+          return;
+        }
+      }
+
+      // Priority 2.5: balls
       for (const key of ['white', 'yellow', 'red']) {
         const bpt = normToPx(balls[key].x, balls[key].y);
         if (Math.hypot(px - bpt.x, py - bpt.y) <= 24) {
           setDraggingBall(key);
           setSelectedLineId(null);
+          setSelectedPointId(null);
+          setSelectedTextId(null);
           return;
         }
       }
@@ -432,9 +876,9 @@ export default function TableCanvas({
       // Priority 3: line segment → select
       for (const line of lines) {
         for (let i = 0; i < line.points.length - 1; i++) {
-          const p1  = normToPx(line.points[i].x,     line.points[i].y);
-          const p2  = normToPx(line.points[i + 1].x, line.points[i + 1].y);
-          const l2  = (p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2;
+          const p1 = normToPx(line.points[i].x, line.points[i].y);
+          const p2 = normToPx(line.points[i + 1].x, line.points[i + 1].y);
+          const l2 = (p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2;
           if (l2 === 0) continue;
           let t = ((px - p1.x) * (p2.x - p1.x) + (py - p1.y) * (p2.y - p1.y)) / l2;
           t = Math.max(0, Math.min(1, t));
@@ -442,12 +886,16 @@ export default function TableCanvas({
           const projY = p1.y + t * (p2.y - p1.y);
           if (Math.hypot(px - projX, py - projY) < 12) {
             setSelectedLineId(line.id);
+            setSelectedPointId(null);
+            setSelectedTextId(null);
             return;
           }
         }
       }
 
       setSelectedLineId(null);
+      setSelectedPointId(null);
+      setSelectedTextId(null);
       return;
     }
 
@@ -463,38 +911,60 @@ export default function TableCanvas({
 
     // ── Text tool ──
     if (activeTool === 'text') {
+      const { snappedNx, snappedNy } = getSnapGuides(nx, ny, null);
       const labelText = prompt('Ingrese texto o número para la jugada:', 'Ataque 30');
       if (labelText && labelText.trim()) {
-        setTexts(prev => [...prev, {
+        const newText = {
           id: `text-${Date.now()}`,
-          x: nx, y: ny,
+          x: snappedNx,
+          y: snappedNy,
           text: labelText.trim(),
-          color: '#f59e0b',
-        }]);
+          color: textColor || '#f59e0b',
+        };
+        setTexts(prev => [...prev, newText]);
+        setSelectedTextId(newText.id);
+        setSelectedPointId(null);
+        setSelectedLineId(null);
       }
       return;
     }
 
     // ── Eraser ──
     if (activeTool === 'eraser') {
+      // Check points first
+      const hitPointIdx = points.findIndex(p => {
+        const ppt = normToPx(p.x, p.y);
+        const pr = Math.max(10, (p.radius || pointRadius || 8) * (dimensions.width / 900) + 4);
+        return Math.hypot(px - ppt.x, py - ppt.y) <= pr;
+      });
+      if (hitPointIdx !== -1) {
+        const targetId = points[hitPointIdx]?.id;
+        setPoints(prev => prev.filter(p => p.id !== targetId));
+        if (selectedPointId === targetId) setSelectedPointId(null);
+        return;
+      }
+
+      // Check text annotations
       const hitIdx = texts.findIndex(t => {
         const tpt = normToPx(t.x, t.y);
-        return Math.hypot(px - tpt.x, py - tpt.y) < 20;
+        return Math.hypot(px - tpt.x, py - tpt.y) < 24;
       });
       if (hitIdx !== -1) {
-        setTexts(prev => prev.filter((_, i) => i !== hitIdx));
+        const targetId = texts[hitIdx]?.id;
+        setTexts(prev => prev.filter(t => t.id !== targetId));
+        if (selectedTextId === targetId) setSelectedTextId(null);
         return;
       }
       if (lines.length > 0) setLines(prev => prev.slice(0, -1));
     }
-  }, [activeTool, selectedLineId, lines, balls, currentLinePoints, texts, normToPx, pxToNorm]);
+  }, [activeTool, selectedLineId, selectedPointId, selectedTextId, lines, balls, currentLinePoints, texts, points, pointRadius, pointColor, textColor, normToPx, pxToNorm, getSnapGuides, setPoints, setSelectedPointId, setTexts, setSelectedTextId]);
 
   const handlePointerMove = useCallback((e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const px   = e.clientX - rect.left;
-    const py   = e.clientY - rect.top;
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
     const { nx, ny } = pxToNorm(px, py);
 
     if (draggingVertex) {
@@ -509,20 +979,40 @@ export default function TableCanvas({
       return;
     }
 
-    if (draggingBall) {
-      setBalls(prev => ({ ...prev, [draggingBall]: { ...prev[draggingBall], x: nx, y: ny } }));
+    if (draggingPoint) {
+      const { snappedNx, snappedNy, guides } = getSnapGuides(nx, ny, draggingPoint);
+      setPoints(prev => prev.map(p => (p.id === draggingPoint ? { ...p, x: snappedNx, y: snappedNy } : p)));
+      setActiveGuides(guides);
       return;
     }
 
-    if (currentLinePoints) {
-      setMousePreviewPoint({ x: nx, y: ny });
+    if (draggingBall) {
+      setBalls(prev => ({ ...prev, [draggingBall]: { ...prev[draggingBall], x: nx, y: ny } }));
+      setActiveGuides([]);
+      return;
     }
-  }, [draggingVertex, draggingBall, currentLinePoints, pxToNorm]);
+
+    if (draggingText) {
+      const { snappedNx, snappedNy, guides } = getSnapGuides(nx, ny, draggingText);
+      setTexts(prev => prev.map(t => (t.id === draggingText ? { ...t, x: snappedNx, y: snappedNy } : t)));
+      setActiveGuides(guides);
+      return;
+    }
+
+    if (currentLinePoints || activeTool === 'point' || activeTool === 'text') {
+      const { snappedNx, snappedNy, guides } = getSnapGuides(nx, ny, null);
+      setMousePreviewPoint({ x: snappedNx, y: snappedNy });
+      setActiveGuides(guides);
+    }
+  }, [draggingVertex, draggingPoint, draggingBall, draggingText, currentLinePoints, activeTool, pxToNorm, getSnapGuides, setPoints, setTexts]);
 
   const handlePointerUp = useCallback(() => {
+    setActiveGuides([]);
     if (draggingVertex) { setDraggingVertex(null); return; }
-    if (draggingBall)   { setDraggingBall(null); }
-  }, [draggingVertex, draggingBall]);
+    if (draggingPoint) { setDraggingPoint(null); return; }
+    if (draggingBall) { setDraggingBall(null); return; }
+    if (draggingText) { setDraggingText(null); }
+  }, [draggingVertex, draggingPoint, draggingBall, draggingText]);
 
   const handleDoubleClick = useCallback(() => {
     if (currentLinePoints && currentLinePoints.length >= 2) finishCurrentLine();
@@ -531,51 +1021,184 @@ export default function TableCanvas({
   // ── Keyboard shortcuts ───────────────────────────────────────
   useEffect(() => {
     const onKey = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
       if (e.key === 'Escape' && currentLinePoints) finishCurrentLine();
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedLineId && !currentLinePoints) dropSelectedLine();
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedTextId) {
+          setTexts(prev => prev.filter(t => t.id !== selectedTextId));
+          setSelectedTextId(null);
+        } else if (selectedPointId) {
+          setPoints(prev => prev.filter(p => p.id !== selectedPointId));
+          setSelectedPointId(null);
+        } else if (selectedLineId && !currentLinePoints) {
+          dropSelectedLine();
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [currentLinePoints, selectedLineId, finishCurrentLine, dropSelectedLine]);
+  }, [currentLinePoints, selectedLineId, selectedPointId, selectedTextId, finishCurrentLine, dropSelectedLine, setPoints, setSelectedPointId, setTexts, setSelectedTextId]);
 
-  // ── PNG Export ───────────────────────────────────────────────
+  // ── PNG Export (Full HD 1080p) ───────────────────────────────
   const exportPNG = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const link     = document.createElement('a');
-    link.download  = `billiard-diagram-${Date.now()}.png`;
-    link.href      = canvas.toDataURL('image/png');
+    let activeLines = [...lines];
+    if (currentLinePoints && currentLinePoints.length >= 2) {
+      finishCurrentLine();
+      const color = activeTool === 'arrow' ? '#f59e0b' : '#06b6d4';
+      activeLines.push({
+        id: `line-${Date.now()}`,
+        points: [...currentLinePoints],
+        color,
+        style: 'solid',
+        width: 2,
+        isArrow: activeTool === 'arrow',
+      });
+    }
+
+    const hdCanvas = document.createElement('canvas');
+    renderDiagramToCanvas({
+      canvas: hdCanvas,
+      width: 1920,
+      height: 960,
+      clothColor,
+      showDiamonds,
+      balls,
+      lines: activeLines,
+      points,
+      texts,
+      strikeMode,
+      spin,
+      strike,
+      showHeader: false,
+      showWatermark: true,
+      showStrikeWidget: strikeMode,
+    });
+
+    const dataUrl = hdCanvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = `billiard-diagram-HD-${Date.now()}.png`;
+    link.href = dataUrl;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, []);
+  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, balls, points, texts, strikeMode, spin, strike]);
 
   useEffect(() => {
     if (onRegisterExportHandler) onRegisterExportHandler(() => exportPNG);
   }, [onRegisterExportHandler, exportPNG]);
 
-  // ── Frame capture (for movie feature) ───────────────────────
-  const captureFrame = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    // Force a fresh render so the snapshot is up to date.
-    drawCanvas();
+  // ── Frame capture in HD (for movie feature) ───────────────────
+  const captureFrame = useCallback((options = {}) => {
+    let activeLines = [...lines];
+    if (currentLinePoints && currentLinePoints.length >= 2) {
+      finishCurrentLine();
+      const color = activeTool === 'arrow' ? '#f59e0b' : '#06b6d4';
+      activeLines.push({
+        id: `line-${Date.now()}`,
+        points: [...currentLinePoints],
+        color,
+        style: 'solid',
+        width: 2,
+        isArrow: activeTool === 'arrow',
+      });
+    }
+
+    const showHeader = options.showHeader ?? false;
+    const titleText = options.titleText ?? 'Billiard Sketcher — Animación 3 Bandas';
+    const showWatermark = options.showWatermark ?? true;
+    const watermarkText = options.watermarkText ?? 'Billiard Sketcher • 3-Bandas HD';
+
+    const hdCanvas = document.createElement('canvas');
+    renderDiagramToCanvas({
+      canvas: hdCanvas,
+      width: 1920,
+      height: 960,
+      clothColor,
+      showDiamonds,
+      balls,
+      lines: activeLines,
+      points,
+      texts,
+      strikeMode,
+      spin,
+      strike,
+      showHeader,
+      titleText,
+      showWatermark,
+      watermarkText,
+      showStrikeWidget: strikeMode,
+    });
+
+    const dataUrl = hdCanvas.toDataURL('image/png');
     return {
-      dataUrl: canvas.toDataURL('image/png'),
-      width:   canvas.width,
-      height:  canvas.height,
+      dataUrl,
+      width: 1920,
+      height: 960,
     };
-  }, [drawCanvas]);
+  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, balls, points, texts, strikeMode, spin, strike]);
 
   useEffect(() => {
     if (onRegisterCaptureHandler) onRegisterCaptureHandler(() => captureFrame);
   }, [onRegisterCaptureHandler, captureFrame]);
 
+  // ── JSON Import / Export Helpers ─────────────────────────────
+  const getDiagramData = useCallback(() => {
+    return {
+      version: '1.0',
+      generator: 'Billiard Sketcher',
+      timestamp: Date.now(),
+      table: {
+        clothColor,
+        showDiamonds,
+        showAlignmentGuides,
+      },
+      balls,
+      lines,
+      points,
+      texts,
+      strike: {
+        spin,
+        strike,
+        strikeMode,
+      },
+    };
+  }, [clothColor, showDiamonds, showAlignmentGuides, balls, lines, points, texts, spin, strike, strikeMode]);
+
+  const loadDiagramData = useCallback((data) => {
+    if (!data) return;
+    if (data.balls) setBalls(data.balls);
+    if (data.lines) setLines(data.lines);
+    if (data.points) setPoints(data.points);
+    if (data.texts) setTexts(data.texts);
+    if (data.table?.clothColor) setClothColor(data.table.clothColor);
+    if (data.table?.showDiamonds !== undefined) setShowDiamonds(data.table.showDiamonds);
+    if (data.table?.showAlignmentGuides !== undefined) setShowAlignmentGuides(data.table.showAlignmentGuides);
+    if (data.strike?.spin) setSpin(data.strike.spin);
+    if (data.strike?.strike !== undefined) setStrike(data.strike.strike);
+    if (data.strike?.strikeMode !== undefined) setStrikeMode(data.strike.strikeMode);
+  }, [setPoints, setTexts, setClothColor, setShowDiamonds, setShowAlignmentGuides, setSpin, setStrike, setStrikeMode]);
+
+  useEffect(() => {
+    if (onRegisterJsonHandler) {
+      onRegisterJsonHandler(() => ({ getDiagramData, loadDiagramData }));
+    }
+  }, [onRegisterJsonHandler, getDiagramData, loadDiagramData]);
+
   // ── Status hint text ─────────────────────────────────────────
   let hintText = 'Selecciona "Línea Poligonal" para dibujar recorridos continuos.';
-  if (draggingVertex)    hintText = `Moviendo vértice ${draggingVertex.pointIndex + 1}…`;
+  if (draggingVertex) hintText = `Moviendo vértice ${draggingVertex.pointIndex + 1}…`;
+  else if (draggingPoint) hintText = 'Moviendo punto…';
+  else if (draggingText) hintText = 'Moviendo texto…';
+  else if (activeTool === 'point')
+    hintText = 'Haz clic en cualquier posición de la mesa (incluidas bandas) para colocar un punto.';
+  else if (activeTool === 'text')
+    hintText = 'Haz clic en cualquier posición de la mesa para ingresar texto.';
   else if (currentLinePoints)
     hintText = `${currentLinePoints.length} punto${currentLinePoints.length !== 1 ? 's' : ''} — Doble clic o "Finalizar" para confirmar.`;
+  else if (selectedTextId)
+    hintText = 'Texto seleccionado — ajusta su contenido o color en el panel lateral. (Presiona Supr para eliminar)';
+  else if (selectedPointId)
+    hintText = 'Punto seleccionado — configura su radio o color en el panel lateral.';
   else if (selectedLineId)
     hintText = 'Línea seleccionada — arrastra los vértices (●) para moverlos individualmente.';
 
@@ -593,6 +1216,17 @@ export default function TableCanvas({
           style={{ cursor: draggingVertex ? 'grabbing' : 'crosshair' }}
           className="block rounded-lg touch-none select-none shadow-inner"
         />
+
+        {strikeMode && (
+          <StrikePanel
+            spin={spin}
+            setSpin={setSpin}
+            strike={strike}
+            setStrike={setStrike}
+            clothColor={clothColor}
+            onClose={() => setStrikeMode(false)}
+          />
+        )}
       </div>
 
       <div className="flex items-center justify-between w-full max-w-4xl px-2 mt-2 text-xs text-slate-400">

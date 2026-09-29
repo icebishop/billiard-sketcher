@@ -1,8 +1,8 @@
 import React from 'react';
 import {
-  Move, PenTool, ArrowUpRight, Type, Eraser,
+  Move, PenTool, ArrowUpRight, CircleDot, Type, Eraser,
   Download, RotateCcw, CheckCircle, Trash2,
-  Film, Camera, Clock,
+  Film, Camera, Clock, Crosshair, Save, FolderOpen,
 } from 'lucide-react';
 
 /* ── Preset color palette ── */
@@ -43,6 +43,8 @@ export default function Toolbar({
   setActiveTool,
   onDownloadPNG,
   onResetTable,
+  onSaveJSON,
+  onLoadJSON,
   isDrawingLine,
   onFinishLine,
   selectedLineId,
@@ -55,11 +57,15 @@ export default function Toolbar({
   onFrameSecondsChange,
   onAddFrame,
   frameCount,
+  strikeMode,
+  onToggleStrikeMode,
+  onOpenHDModal,
 }) {
   const tools = [
     { id: 'move',   label: 'Mover',  icon: Move,         shortcut: 'V' },
     { id: 'line',   label: 'Línea',  icon: PenTool,      shortcut: 'L' },
     { id: 'arrow',  label: 'Flecha', icon: ArrowUpRight, shortcut: 'A' },
+    { id: 'point',  label: 'Punto',  icon: CircleDot,    shortcut: 'P' },
     { id: 'text',   label: 'Texto',  icon: Type,         shortcut: 'T' },
     { id: 'eraser', label: 'Borrar', icon: Eraser,       shortcut: 'E' },
   ];
@@ -219,6 +225,21 @@ export default function Toolbar({
         </>
       )}
 
+      {/* ── Section: Strike & Spin (Toma y Efecto) ── */}
+      <Sep />
+      <div className="tb-group">
+        <button
+          id="btn-strike-mode"
+          onClick={onToggleStrikeMode}
+          title="Toma y Efecto — ensaya la toma y el efecto del taco"
+          className={`tb-tool${strikeMode ? ' active' : ''}`}
+          style={{ minWidth: 62 }}
+        >
+          <Crosshair size={15} strokeWidth={2.1} />
+          <span className="tb-tool-label">Toma/Efecto</span>
+        </button>
+      </div>
+
       {/* ── Section: Movie / Animation ── */}
       <Sep />
       <div className="tb-group">
@@ -289,8 +310,28 @@ export default function Toolbar({
       {/* ── Spacer ── */}
       <div style={{ flex: 1, minWidth: 12 }} />
 
-      {/* ── Section 4: Global Actions ── */}
+      {/* ── Section 4: Global Actions (JSON Load/Save & PNG Export) ── */}
       <div className="tb-group">
+        <button
+          id="btn-load-json"
+          onClick={onLoadJSON}
+          className="tb-ghost"
+          title="Cargar configuración completa desde archivo JSON"
+        >
+          <FolderOpen size={14} strokeWidth={2.1} />
+          <span style={{ fontSize: 12 }}>Cargar JSON</span>
+        </button>
+
+        <button
+          id="btn-save-json"
+          onClick={onSaveJSON}
+          className="tb-ghost"
+          title="Guardar todos los componentes de la mesa como archivo JSON"
+        >
+          <Save size={14} strokeWidth={2.1} />
+          <span style={{ fontSize: 12 }}>Guardar JSON</span>
+        </button>
+
         <button
           id="btn-reset-table"
           onClick={onResetTable}
@@ -302,13 +343,29 @@ export default function Toolbar({
         </button>
 
         <button
+          id="btn-export-hd"
+          onClick={onOpenHDModal}
+          className="tb-primary"
+          style={{
+            background: 'linear-gradient(135deg, #0ea5e9 0%, #10b981 100%)',
+            boxShadow: '0 4px 12px rgba(14,165,233,0.3)',
+            fontWeight: 700,
+            gap: 6,
+          }}
+          title="Abrir opciones de captura HD (1080p, 2K, 4K, 8K)"
+        >
+          <Camera size={14} strokeWidth={2.2} />
+          Captura HD
+        </button>
+
+        <button
           id="btn-export-png"
           onClick={onDownloadPNG}
-          className="tb-primary"
-          title="Exportar diagrama como PNG de alta resolución"
+          className="tb-ghost"
+          title="Exportar rápida directa como PNG"
         >
-          <Download size={14} strokeWidth={2.2} />
-          Exportar PNG
+          <Download size={14} strokeWidth={2.1} />
+          <span style={{ fontSize: 12 }}>PNG Rápido</span>
         </button>
       </div>
 
