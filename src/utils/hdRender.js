@@ -22,6 +22,22 @@ function drawRoundedRect(ctx, x, y, w, h, r = 0) {
   }
 }
 
+/**
+ * Returns the band/rail color that matches the chosen cloth color.
+ * Green  → wood brown (default)
+ * Blue   → grey
+ * Grey   → black
+ * Black  → near-black
+ */
+function getRailColor(clothColor) {
+  switch (clothColor) {
+    case '#1e3a8a': return '#4b5563'; // blue cloth  → grey rail
+    case '#334155': return '#111827'; // grey cloth  → black rail
+    case '#111827': return '#0a0a0a'; // black cloth → near-black rail
+    default:        return '#3b1c0a'; // green (and anything else) → wood brown
+  }
+}
+
 function adjustColorBrightness(hex, percent) {
   if (!hex || typeof hex !== 'string') return '#888888';
   let num = parseInt(hex.replace('#', ''), 16);
@@ -103,12 +119,13 @@ export function renderDiagramToCanvas({
     ctx.textBaseline = 'middle';
     ctx.fillText(titleText || 'Billiard Sketcher — Diagrama 3 Bandas', width * 0.03, bannerHeight / 2);
 
-    // Banner Text Right (Subtitle & Timestamp)
-    const rightText = subtitleText || `Billiard Sketcher • ${new Date().toLocaleDateString()}`;
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = `600 ${Math.round(bannerHeight * 0.32)}px Inter, system-ui, sans-serif`;
-    ctx.textAlign = 'right';
-    ctx.fillText(rightText, width * 0.97, bannerHeight / 2);
+    // Banner Text Right (Subtitle)
+    if (subtitleText) {
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = `600 ${Math.round(bannerHeight * 0.32)}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.fillText(subtitleText, width * 0.97, bannerHeight / 2);
+    }
 
     ctx.restore();
   }
@@ -130,7 +147,7 @@ export function renderDiagramToCanvas({
 
   // 1. Outer wooden rail
   ctx.save();
-  ctx.fillStyle = '#3b1c0a';
+  ctx.fillStyle = getRailColor(clothColor);
   ctx.fillRect(0, tableTop, width, height);
 
   // Top highlight & bottom shadow lines on wood
@@ -499,6 +516,375 @@ export async function downloadHDDiagram(diagramData, options = {}) {
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   return true;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SVG Export — vector rendering matching the HD canvas output
+═══════════════════════════════════════════════════════════════ */
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function hexToRgb(hex) {
+  if (!hex || typeof hex !== 'string') return { r: 136, g: 136, b: 136 };
+  const n = parseInt(hex.replace('#', ''), 16);
+  if (isNaN(n)) return { r: 136, g: 136, b: 136 };
+  return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+}
+
+function adjustHexBrightness(hex, pct) {
+  const { r, g, b } = hexToRgb(hex);
+  const clamp = (v) => Math.min(255, Math.max(0, Math.round(v + pct)));
+  return `#${clamp(r).toString(16).padStart(2,'0')}${clamp(g).toString(16).padStart(2,'0')}${clamp(b).toString(16).padStart(2,'0')}`;
+}
+
+/**
+ * Generate a complete SVG string for the billiard diagram.
+ * Uses the same coordinate math as renderDiagramToCanvas so the
+ * visual output is identical, but the result is infinitely scalable.
+ *
+ * @param {object} diagramData   Same shape consumed by renderDiagramToCanvas
+ * @param {object} options       Same options accepted by generateHDDiagramBlob
+ * @returns {string}             UTF-8 SVG markup
+ */
+export function generateDiagramSVG(diagramData, options = {}) {
+  const {
+    width  = 1920,
+    height = 960,
+    showHeader    = false,
+    titleText     = 'Billiard Sketcher — Diagrama 3 Bandas',
+    subtitleText  = '',
+    showWatermark = true,
+    watermarkText = 'Billiard Sketcher • 3-Bandas HD',
+    showStrikeWidget = null,
+  } = options;
+
+  const clothColor  = diagramData.table?.clothColor  ?? '#0d5c3a';
+  const showDiamonds = diagramData.table?.showDiamonds ?? true;
+  const balls       = diagramData.balls  ?? {};
+  const lines       = diagramData.lines  ?? [];
+  const points      = diagramData.points ?? [];
+  const texts       = diagramData.texts  ?? [];
+  const spin        = diagramData.strike?.spin      ?? { x: 0, y: 0 };
+  const strike      = diagramData.strike?.strike    ?? -0.5;
+  const strikeMode  = diagramData.strike?.strikeMode ?? false;
+  const includeStrike = showStrikeWidget !== null ? showStrikeWidget : strikeMode;
+
+  const bannerHeight = showHeader ? Math.max(48, Math.round(width * 0.05)) : 0;
+  const totalHeight  = height + bannerHeight;
+
+  const marginX    = width  * 0.045;
+  const marginY    = height * 0.09;
+  const playWidth  = width  - marginX * 2;
+  const playHeight = height - marginY * 2;
+  const scale      = playWidth / 819;
+  const tableTop   = bannerHeight;
+
+  const normToPx = (nx, ny) => ({
+    x: marginX + nx * playWidth,
+    y: tableTop + marginY + ny * playHeight,
+  });
+
+  const ballRadius = Math.max(6 * scale, playWidth * (30.75 / 2840));
+
+  // ── Unique IDs for gradients / defs ─────────────────────────────
+  const uid = `bsk${Math.random().toString(36).slice(2, 8)}`;
+  let defs = '';
+  let body = '';
+
+  // ── 0. Background rect ──────────────────────────────────────────
+  body += `<rect width="${width}" height="${totalHeight}" fill="#07090f"/>`;
+
+  // ── 1. Banner ───────────────────────────────────────────────────
+  if (showHeader) {
+    defs += `
+      <linearGradient id="${uid}_banner" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0"   stop-color="#07090f"/>
+        <stop offset="0.5" stop-color="#0f172a"/>
+        <stop offset="1"   stop-color="#07090f"/>
+      </linearGradient>
+      <linearGradient id="${uid}_bannerLine" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0"   stop-color="rgba(14,165,233,0.2)"/>
+        <stop offset="0.5" stop-color="#0ea5e9"/>
+        <stop offset="1"   stop-color="rgba(16,185,129,0.2)"/>
+      </linearGradient>`;
+
+    body += `<rect width="${width}" height="${bannerHeight}" fill="url(#${uid}_banner)"/>`;
+    body += `<rect y="${bannerHeight - 3}" width="${width}" height="3" fill="url(#${uid}_bannerLine)"/>`;
+
+    const fs1 = Math.round(bannerHeight * 0.38);
+    const fs2 = Math.round(bannerHeight * 0.32);
+    body += `<text x="${width * 0.03}" y="${bannerHeight / 2}" dominant-baseline="middle" text-anchor="start"
+      font-family="Inter,system-ui,sans-serif" font-size="${fs1}" font-weight="700" fill="#f8fafc"
+    >${esc(titleText)}</text>`;
+
+    if (subtitleText) {
+      body += `<text x="${width * 0.97}" y="${bannerHeight / 2}" dominant-baseline="middle" text-anchor="end"
+        font-family="Inter,system-ui,sans-serif" font-size="${fs2}" font-weight="600" fill="#38bdf8"
+      >${esc(subtitleText)}</text>`;
+    }
+  }
+
+  // ── 2. Wooden rail ──────────────────────────────────────────────
+  body += `<rect x="0" y="${tableTop}" width="${width}" height="${height}" fill="${getRailColor(clothColor)}"/>`;
+  body += `<rect x="0" y="${tableTop}" width="${width}" height="${Math.max(2, height * 0.008)}" fill="rgba(255,255,255,0.08)"/>`;
+  body += `<rect x="0" y="${tableTop + height - Math.max(4, height * 0.012)}" width="${width}" height="${Math.max(4, height * 0.012)}" fill="rgba(0,0,0,0.4)"/>`;
+
+  // ── 3. Cloth ────────────────────────────────────────────────────
+  body += `<rect x="${marginX}" y="${tableTop + marginY}" width="${playWidth}" height="${playHeight}" fill="${esc(clothColor)}"/>`;
+  body += `<rect x="${marginX}" y="${tableTop + marginY}" width="${playWidth}" height="${playHeight}"
+    fill="none" stroke="#052b1b" stroke-width="${Math.max(2, playWidth * 0.005)}"/>`;
+
+  // Cushion bevels
+  const bevelW = Math.max(4, playWidth * 0.005);
+  body += `<rect x="${marginX - bevelW}" y="${tableTop + marginY - bevelW}" width="${playWidth + bevelW * 2}" height="${bevelW}" fill="rgba(0,0,0,0.25)"/>`;
+  body += `<rect x="${marginX - bevelW}" y="${tableTop + marginY + playHeight}" width="${playWidth + bevelW * 2}" height="${bevelW}" fill="rgba(0,0,0,0.25)"/>`;
+  body += `<rect x="${marginX - bevelW}" y="${tableTop + marginY - bevelW}" width="${bevelW}" height="${playHeight + bevelW * 2}" fill="rgba(0,0,0,0.25)"/>`;
+  body += `<rect x="${marginX + playWidth}" y="${tableTop + marginY - bevelW}" width="${bevelW}" height="${playHeight + bevelW * 2}" fill="rgba(0,0,0,0.25)"/>`;
+
+  // ── 4. Diamonds ──────────────────────────────────────────────────
+  if (showDiamonds) {
+    const dr = Math.max(3 * scale, playWidth * 0.004);
+    const diamond = (cx, cy) =>
+      `<polygon points="${cx},${cy - dr} ${cx + dr * 0.75},${cy} ${cx},${cy + dr} ${cx - dr * 0.75},${cy}"
+        fill="#f8fafc" stroke="#1e293b" stroke-width="${Math.max(1, scale * 0.8)}"/>`;
+
+    for (let i = 0; i <= 8; i++) {
+      body += diamond(marginX + (i / 8) * playWidth, tableTop + marginY / 2);
+      body += diamond(marginX + (i / 8) * playWidth, tableTop + height - marginY / 2);
+    }
+    for (let j = 0; j <= 4; j++) {
+      body += diamond(marginX / 2, tableTop + marginY + (j / 4) * playHeight);
+      body += diamond(width - marginX / 2, tableTop + marginY + (j / 4) * playHeight);
+    }
+  }
+
+  // ── 5. Lines & arrows ────────────────────────────────────────────
+  lines.forEach((line, li) => {
+    if (!line.points || line.points.length < 2) return;
+    const lw    = Math.max(1.5, (line.width || 2) * scale);
+    const color = line.color || '#06b6d4';
+    let dashAttr = '';
+    if (line.style === 'dashed') dashAttr = `stroke-dasharray="${lw * 6} ${lw * 3}"`;
+    else if (line.style === 'dotted') dashAttr = `stroke-dasharray="${lw * 1.5} ${lw * 4}"`;
+
+    const pts = line.points.map(p => {
+      const { x, y } = normToPx(p.x, p.y);
+      return `${x},${y}`;
+    }).join(' ');
+
+    body += `<polyline points="${pts}" fill="none" stroke="${esc(color)}"
+      stroke-width="${lw}" stroke-linecap="round" stroke-linejoin="round" ${dashAttr}/>`;
+
+    // Arrow head
+    if (line.isArrow && line.points.length >= 2) {
+      const last = normToPx(line.points[line.points.length - 1].x, line.points[line.points.length - 1].y);
+      const prev = normToPx(line.points[line.points.length - 2].x, line.points[line.points.length - 2].y);
+      const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+      const al = Math.max(10 * scale, playWidth * 0.013) + lw;
+      const ax1 = last.x - al * Math.cos(angle - Math.PI / 6);
+      const ay1 = last.y - al * Math.sin(angle - Math.PI / 6);
+      const ax2 = last.x - al * Math.cos(angle + Math.PI / 6);
+      const ay2 = last.y - al * Math.sin(angle + Math.PI / 6);
+      body += `<polygon points="${last.x},${last.y} ${ax1},${ay1} ${ax2},${ay2}" fill="${esc(color)}"/>`;
+    }
+  });
+
+  // ── 6. Points ────────────────────────────────────────────────────
+  points.forEach((ptNorm, pi) => {
+    const pt    = normToPx(ptNorm.x, ptNorm.y);
+    const baseR = ptNorm.radius || 8;
+    const r     = Math.max(3, baseR * scale);
+    const col   = ptNorm.color || '#ef4444';
+    const dark  = adjustHexBrightness(col, -40);
+    const gradId = `${uid}_pt${pi}`;
+
+    defs += `
+      <radialGradient id="${gradId}" cx="${pt.x - r * 0.3}" cy="${pt.y - r * 0.3}" r="${r}"
+        fx="${pt.x - r * 0.3}" fy="${pt.y - r * 0.3}" gradientUnits="userSpaceOnUse">
+        <stop offset="0"    stop-color="#ffffff"/>
+        <stop offset="0.35" stop-color="${esc(col)}"/>
+        <stop offset="1"    stop-color="${esc(dark)}"/>
+      </radialGradient>`;
+
+    body += `<circle cx="${pt.x}" cy="${pt.y}" r="${r}"
+      fill="url(#${gradId})"
+      stroke="rgba(255,255,255,0.75)" stroke-width="${Math.max(1, r * 0.15)}"
+      filter="drop-shadow(${Math.max(1, r * 0.1)}px ${Math.max(2, r * 0.2)}px ${Math.max(2, r * 0.4)}px rgba(0,0,0,0.5))"/>`;
+  });
+
+  // ── 7. Texts ─────────────────────────────────────────────────────
+  texts.forEach((t) => {
+    const pt      = normToPx(t.x, t.y);
+    const fontSize = Math.max(12 * scale, Math.round(playWidth * 0.015));
+    const col     = t.color || '#f59e0b';
+    body += `<text x="${pt.x}" y="${pt.y}" dominant-baseline="middle" text-anchor="middle"
+      font-family="Inter,system-ui,sans-serif" font-size="${fontSize}" font-weight="700"
+      fill="${esc(col)}"
+      filter="drop-shadow(1px 1px ${Math.max(2, fontSize * 0.2)}px rgba(0,0,0,0.85))"
+    >${esc(t.text)}</text>`;
+  });
+
+  // ── 8. Balls ─────────────────────────────────────────────────────
+  const ballConfigs = {
+    white:  { stops: [['0','#ffffff'],['0.7','#e2e8f0'],['1','#94a3b8']], stroke: '#cbd5e1', label: '#0f172a' },
+    yellow: { stops: [['0','#fef08a'],['0.7','#facc15'],['1','#ca8a04']], stroke: '#eab308', label: '#0f172a' },
+    red:    { stops: [['0','#fca5a5'],['0.6','#dc2626'],['1','#7f1d1d']], stroke: '#991b1b', label: '#ffffff' },
+  };
+
+  Object.entries(ballConfigs).forEach(([key, cfg]) => {
+    const b = balls[key];
+    if (!b) return;
+    const pt  = normToPx(b.x, b.y);
+    const r   = ballRadius;
+    const gid = `${uid}_ball_${key}`;
+
+    defs += `
+      <radialGradient id="${gid}" cx="${pt.x - r * 0.3}" cy="${pt.y - r * 0.3}" r="${r}"
+        fx="${pt.x - r * 0.3}" fy="${pt.y - r * 0.3}" gradientUnits="userSpaceOnUse">
+        ${cfg.stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}
+      </radialGradient>`;
+
+    body += `<circle cx="${pt.x}" cy="${pt.y}" r="${r}"
+      fill="url(#${gid})"
+      stroke="${cfg.stroke}" stroke-width="${Math.max(1, r * 0.08)}"
+      filter="drop-shadow(${Math.max(2, r * 0.15)}px ${Math.max(3, r * 0.25)}px ${Math.max(3, r * 0.4)}px rgba(0,0,0,0.5))"/>`;
+
+    if (r >= 6) {
+      body += `<text x="${pt.x}" y="${pt.y}" dominant-baseline="middle" text-anchor="middle"
+        font-family="Inter,system-ui,sans-serif" font-size="${Math.round(r * 0.95)}" font-weight="700"
+        fill="${cfg.label}">${esc(b.label || '')}</text>`;
+    }
+  });
+
+  // ── 9. Strike & Spin Widget ───────────────────────────────────────
+  if (includeStrike) {
+    const cardW = Math.min(260 * scale, playWidth * 0.34);
+    const cardH = cardW * (128 / 260);
+    const cardX = marginX + playWidth - cardW - 12 * scale;
+    const cardY = tableTop + marginY + playHeight - cardH - 12 * scale;
+    const rad   = 12 * scale;
+
+    // Card background
+    body += `<rect x="${cardX}" y="${cardY}" width="${cardW}" height="${cardH}" rx="${rad}" ry="${rad}"
+      fill="${esc(clothColor)}" stroke="rgba(0,0,0,0.45)" stroke-width="${Math.max(1.5, 2 * scale)}"/>`;
+
+    const headerH  = 20 * scale;
+    const stageTop = cardY + headerH;
+    const stageH   = cardH - headerH;
+    const cx       = cardX + cardW / 2;
+    const cy2      = stageTop + stageH / 2;
+    const ballR    = Math.min(cardH * 0.24, cardW * 0.12);
+    const shiftX   = strike * (ballR * 2);
+
+    const fullness = Math.max(0, 1 - Math.abs(strike));
+    const fraction =
+      fullness >= 0.94 ? '1/1' :
+      fullness >= 0.80 ? '7/8' :
+      fullness >= 0.68 ? '3/4' :
+      fullness >= 0.56 ? '5/8' :
+      fullness >= 0.44 ? '1/2' :
+      fullness >= 0.31 ? '3/8' :
+      fullness >= 0.19 ? '1/4' :
+      fullness >= 0.07 ? '1/8' : '0';
+
+    const hfs = Math.max(9, 9 * scale);
+    body += `<text x="${cardX + 8 * scale}" y="${cardY + headerH / 2 + 1}" dominant-baseline="middle"
+      font-family="Inter,system-ui,sans-serif" font-size="${hfs}" font-weight="700"
+      fill="rgba(255,255,255,0.85)">TOMA / EFECTO</text>`;
+
+    // badge
+    const bfs = Math.max(10, 11 * scale);
+    const bw  = fraction.length * bfs * 0.65 + 12 * scale;
+    const badgeX = cardX + 8 * scale + fraction.length * 0 + hfs * 8.5 + 8 * scale; // approx label width
+    body += `<rect x="${badgeX}" y="${cardY + 3 * scale}" width="${bw}" height="${15 * scale}" rx="${5 * scale}" ry="${5 * scale}" fill="rgba(0,0,0,0.4)"/>`;
+    body += `<text x="${badgeX + bw / 2}" y="${cardY + 3 * scale + 15 * scale / 2 + 1}" dominant-baseline="middle" text-anchor="middle"
+      font-family="monospace" font-size="${bfs}" font-weight="800" fill="#fde68a">${esc(fraction)}</text>`;
+
+    // Centre divider
+    body += `<line x1="${cx}" y1="${stageTop + 12 * scale}" x2="${cx}" y2="${stageTop + stageH - 12 * scale}"
+      stroke="rgba(255,255,255,0.14)" stroke-width="${Math.max(1, scale)}"/>`;
+
+    // Yellow ball (shifted by strike)
+    const ybx = cx + shiftX;
+    const yby = cy2;
+    const ygid = `${uid}_sw_yellow`;
+    defs += `
+      <radialGradient id="${ygid}" cx="${ybx - ballR*0.3}" cy="${yby - ballR*0.3}" r="${ballR}"
+        fx="${ybx - ballR*0.3}" fy="${yby - ballR*0.3}" gradientUnits="userSpaceOnUse">
+        <stop offset="0"    stop-color="#fde68a"/>
+        <stop offset="0.58" stop-color="#f5c518"/>
+        <stop offset="1"    stop-color="#c98a04"/>
+      </radialGradient>`;
+    body += `<circle cx="${ybx}" cy="${yby}" r="${ballR}"
+      fill="url(#${ygid})" fill-opacity="0.6"
+      stroke="rgba(202,138,4,0.85)" stroke-width="${Math.max(1, scale)}"/>`;
+    body += `<text x="${ybx}" y="${yby}" dominant-baseline="middle" text-anchor="middle"
+      font-family="Inter,sans-serif" font-size="${Math.round(ballR * 0.55)}" font-weight="700"
+      fill="#78350f">2</text>`;
+
+    // White ball
+    const wgid = `${uid}_sw_white`;
+    defs += `
+      <radialGradient id="${wgid}" cx="${cx - ballR*0.3}" cy="${cy2 - ballR*0.3}" r="${ballR}"
+        fx="${cx - ballR*0.3}" fy="${cy2 - ballR*0.3}" gradientUnits="userSpaceOnUse">
+        <stop offset="0"    stop-color="#ffffff"/>
+        <stop offset="0.58" stop-color="#dfe6ee"/>
+        <stop offset="1"    stop-color="#9aa7b6"/>
+      </radialGradient>`;
+    body += `<circle cx="${cx}" cy="${cy2}" r="${ballR}"
+      fill="url(#${wgid})" fill-opacity="0.6"
+      stroke="rgba(203,213,225,0.75)" stroke-width="${Math.max(1, scale)}"/>`;
+    body += `<text x="${cx}" y="${cy2}" dominant-baseline="middle" text-anchor="middle"
+      font-family="Inter,sans-serif" font-size="${Math.round(ballR * 0.55)}" font-weight="700"
+      fill="#475569">1</text>`;
+
+    // Spin marker
+    const mkX = cx + spin.x * ballR * 0.8;
+    const mkY = cy2 - spin.y * ballR * 0.8;
+    const mkR = Math.max(3 * scale, ballR * 0.16);
+    body += `<circle cx="${mkX}" cy="${mkY}" r="${mkR}"
+      fill="#dc2626" stroke="#ffffff" stroke-width="${Math.max(1.5, 2 * scale)}"/>`;
+  }
+
+  // ── 10. Watermark ────────────────────────────────────────────────
+  if (showWatermark) {
+    const wfs = Math.max(11, Math.round(11 * scale));
+    body += `<text x="${marginX + playWidth - 8 * scale}" y="${tableTop + marginY + playHeight - 6 * scale}"
+      text-anchor="end" dominant-baseline="auto"
+      font-family="Inter,system-ui,sans-serif" font-size="${wfs}" font-weight="600"
+      fill="rgba(255,255,255,0.45)">${esc(watermarkText)}</text>`;
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 ${width} ${totalHeight}"
+  width="${width}" height="${totalHeight}">
+  <defs>${defs}</defs>
+  ${body}
+</svg>`;
+}
+
+/**
+ * Trigger a browser download of the SVG diagram.
+ */
+export function downloadSVGDiagram(diagramData, options = {}) {
+  const svgStr  = generateDiagramSVG(diagramData, options);
+  const blob    = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+  const url     = URL.createObjectURL(blob);
+  const label   = options.resolutionLabel ? `-${options.resolutionLabel}` : `-${options.width || 1920}p`;
+  const link    = document.createElement('a');
+  link.href     = url;
+  link.download = `billiard-diagram${label}-${Date.now()}.svg`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 /**

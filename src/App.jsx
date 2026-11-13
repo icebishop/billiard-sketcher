@@ -7,7 +7,7 @@ import PointPanel from './components/PointPanel';
 import TextPanel from './components/TextPanel';
 import HDScreenshotModal from './components/HDScreenshotModal';
 import { exportMovieWebM } from './utils/movieExport';
-import { Target, Palette, Layers, Info, Compass } from 'lucide-react';
+import { Palette, Layers, Info, Compass } from 'lucide-react';
 
 export default function App() {
   const [activeTool, setActiveTool]           = useState('move');
@@ -192,18 +192,16 @@ export default function App() {
       >
         {/* Logo + Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              width: 36, height: 36,
-              borderRadius: 10,
-              background: 'linear-gradient(135deg, #10b981 0%, #0ea5e9 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(16,185,129,0.35)',
-              flexShrink: 0,
-            }}
-          >
-            <Target size={18} color="#fff" strokeWidth={2.5} />
-          </div>
+          <img
+              src="/logo.svg"
+              alt="Billiard Sketcher"
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                flexShrink: 0,
+              }}
+            />
           <div>
             <h1
               style={{
@@ -284,11 +282,11 @@ export default function App() {
             position: 'relative',
             flex: 1,
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'stretch',
             justifyContent: 'center',
-            padding: 16,
-            overflow: 'auto',
+            overflow: 'hidden',
             minWidth: 0,
+            minHeight: 0,
           }}
         >
           <TableCanvas

@@ -20,6 +20,15 @@ function drawRoundedRect(ctx, x, y, w, h, r = 0) {
   }
 }
 
+function getRailColor(clothColor) {
+  switch (clothColor) {
+    case '#1e3a8a': return '#4b5563'; // blue  → grey
+    case '#334155': return '#111827'; // grey  → black
+    case '#111827': return '#0a0a0a'; // black → near-black
+    default:        return '#3b1c0a'; // green → wood brown
+  }
+}
+
 function adjustColorBrightness(hex, percent) {
   if (!hex || typeof hex !== 'string') return '#888888';
   let num = parseInt(hex.replace('#', ''), 16);
@@ -104,22 +113,34 @@ export default function TableCanvas({
   const [mousePreviewPoint, setMousePreviewPoint] = useState(null);
   const [selectedLineId, setSelectedLineId] = useState(null);
 
-  // ── Canvas size ──────────────────────────────────────────────
+  // ── Canvas size — fills available space keeping 2:1 aspect ratio ──
+  const containerRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 900, height: 450 });
 
   useEffect(() => {
-    const handleResize = () => {
-      const parent = canvasRef.current?.parentElement;
-      if (parent) {
-        const pWidth = parent.clientWidth - 16;
-        const width = Math.min(Math.max(pWidth, 320), 1200);
-        const height = width / 2;
-        setDimensions({ width, height });
+    const container = containerRef.current;
+    if (!container) return;
+
+    const compute = () => {
+      const availW = container.clientWidth  - 32; // inner padding
+      const availH = container.clientHeight - 48; // room for hint bar
+      if (availW <= 0 || availH <= 0) return;
+      // Fit 2:1 table into the available box
+      let w = availW;
+      let h = w / 2;
+      if (h > availH) {
+        h = availH;
+        w = h * 2;
       }
+      w = Math.max(w, 320);
+      h = w / 2;
+      setDimensions({ width: Math.round(w), height: Math.round(h) });
     };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(container);
+    return () => ro.disconnect();
   }, []);
 
   // ── Coordinate Helpers ───────────────────────────────────────
@@ -291,7 +312,7 @@ export default function TableCanvas({
     const ballRadius = Math.max(6, playWidth * (30.75 / 2840));
 
     // 1. Outer wooden rail
-    ctx.fillStyle = '#3b1c0a';
+    ctx.fillStyle = getRailColor(clothColor);
     ctx.fillRect(0, 0, width, height);
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.fillRect(0, 0, width, 4);
@@ -1203,8 +1224,32 @@ export default function TableCanvas({
     hintText = 'Línea seleccionada — arrastra los vértices (●) para moverlos individualmente.';
 
   return (
-    <div className="w-full flex flex-col items-center justify-center p-2">
-      <div className="relative glass-panel p-2 shadow-2xl rounded-xl border border-slate-700/60 overflow-hidden max-w-full">
+    <div
+      ref={containerRef}
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: '100%',
+        padding: '12px',
+        gap: 8,
+        minHeight: 0,
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          borderRadius: 12,
+          border: '1px solid rgba(100,116,139,0.4)',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+          lineHeight: 0,
+          flexShrink: 0,
+        }}
+      >
         <canvas
           ref={canvasRef}
           width={dimensions.width}
@@ -1213,8 +1258,7 @@ export default function TableCanvas({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onDoubleClick={handleDoubleClick}
-          style={{ cursor: draggingVertex ? 'grabbing' : 'crosshair' }}
-          className="block rounded-lg touch-none select-none shadow-inner"
+          style={{ cursor: draggingVertex ? 'grabbing' : 'crosshair', display: 'block', touchAction: 'none', userSelect: 'none' }}
         />
 
         {strikeMode && (
@@ -1229,10 +1273,10 @@ export default function TableCanvas({
         )}
       </div>
 
-      <div className="flex items-center justify-between w-full max-w-4xl px-2 mt-2 text-xs text-slate-400">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: dimensions.width, maxWidth: '100%', padding: '0 4px', fontSize: 11.5, color: '#64748b' }}>
         <span>💡 {hintText}</span>
         <span>
-          Herramienta: <strong className="text-cyan-400 uppercase">{activeTool}</strong>
+          Herramienta: <strong style={{ color: '#38bdf8', textTransform: 'uppercase' }}>{activeTool}</strong>
         </span>
       </div>
     </div>

@@ -1,0 +1,626 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 512 512"
+   width="512"
+   height="512"
+   version="1.1"
+   id="svg76"
+   sodipodi:docname="gemini-svg(1).svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview76"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.5488281"
+     inkscape:cx="233.07945"
+     inkscape:cy="256"
+     inkscape:window-width="1920"
+     inkscape:window-height="1011"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg76" />
+  <defs
+     id="defs10">
+    <!-- Gradientes estándar compatibles con Inkscape -->
+    <linearGradient
+       id="bgGrad"
+       x1="16"
+       y1="16"
+       x2="496"
+       y2="496"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(0.75788146,0,0,0.76326189,61.982354,60.604969)">
+      <stop
+         offset="0"
+         stop-color="#1d3c2b"
+         id="stop1"
+         style="stop-color:#747ea4;stop-opacity:1;" />
+      <stop
+         offset="1"
+         stop-color="#13291d"
+         id="stop2"
+         style="stop-color:#2f375d;stop-opacity:1;" />
+    </linearGradient>
+    <linearGradient
+       id="clothGrad"
+       x1="-84"
+       y1="-84"
+       x2="84"
+       y2="84"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0%"
+         stop-color="#4e89ab"
+         id="stop3" />
+      <stop
+         offset="100%"
+         stop-color="#366885"
+         id="stop4" />
+    </linearGradient>
+    <linearGradient
+       id="woodGrad"
+       x1="-113"
+       y1="-113"
+       x2="113"
+       y2="113"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0%"
+         stop-color="#5c3d31"
+         id="stop5" />
+      <stop
+         offset="100%"
+         stop-color="#3d271f"
+         id="stop6" />
+    </linearGradient>
+    <linearGradient
+       id="rulerVertGrad"
+       x1="225.31361"
+       y1="70.302012"
+       x2="317.48736"
+       y2="70.302012"
+       gradientTransform="scale(0.39056673,2.5603819)"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0%"
+         stop-color="#dce4e8"
+         id="stop7" />
+      <stop
+         offset="100%"
+         stop-color="#c3cfd6"
+         id="stop8" />
+    </linearGradient>
+    <linearGradient
+       id="rulerHorizGrad"
+       x1="34.225157"
+       y1="977.05908"
+       x2="34.225157"
+       y2="1069.6226"
+       gradientTransform="scale(2.5712081,0.38892223)"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0%"
+         stop-color="#cfd9de"
+         id="stop9" />
+      <stop
+         offset="100%"
+         stop-color="#b5c3cb"
+         id="stop10" />
+    </linearGradient>
+  </defs>
+  <!-- Fondo redondeado de la aplicación -->
+  <rect
+     x="74.108444"
+     y="72.817154"
+     width="363.78311"
+     height="366.36569"
+     rx="81.851196"
+     fill="url(#bgGrad)"
+     id="rect10"
+     style="fill:url(#bgGrad);stroke-width:0.760566" />
+  <!-- Mesa de Carambola (Rotada 45 grados, sin troneras) -->
+  <!-- Trayectoria de boceto a tres bandas (Líneas discontinuas y flechas) -->
+  <!-- Tres Bolas Reglamentarias de Carambola -->
+  <!-- 1. Bola Blanca con puntos rojos -->
+  <!-- 2. Bola Amarilla con puntos rojos -->
+  <!-- 3. Bola Roja -->
+  <!-- Escuadra de Precisión (Abajo a la izquierda) -->
+  <!-- Lápiz Digital / Stylus (Arriba a la derecha) -->
+  <g
+     id="g78"
+     transform="matrix(1.2482816,0,0,1.1969599,-16.594811,-92.677313)">
+    <g
+       id="g73">
+      <!-- Sombra de la escuadra -->
+      <polygon
+         points="300,388 330,424 88,424 88,188 124,218 124,388 "
+         fill="#0b1c13"
+         opacity="0.45"
+         id="polygon42" />
+      <!-- Hoja Vertical -->
+      <polygon
+         points="124,210 124,380 88,416 88,180 "
+         fill="url(#rulerVertGrad)"
+         id="polygon43"
+         style="fill:url(#rulerVertGrad)" />
+      <!-- Hoja Horizontal -->
+      <polygon
+         points="296,380 326,416 88,416 124,380 "
+         fill="url(#rulerHorizGrad)"
+         id="polygon44"
+         style="fill:url(#rulerHorizGrad)" />
+      <!-- Unión a 45 grados -->
+      <line
+         x1="88"
+         y1="416"
+         x2="124"
+         y2="380"
+         stroke="#7d8f99"
+         stroke-width="2"
+         id="line44" />
+      <!-- Marcas de medición verticales -->
+      <g
+         stroke="#455661"
+         stroke-width="2"
+         stroke-linecap="round"
+         id="g58">
+        <line
+           x1="88"
+           y1="215"
+           x2="100"
+           y2="215"
+           id="line45" />
+        <line
+           x1="88"
+           y1="227"
+           x2="108"
+           y2="227"
+           id="line46" />
+        <line
+           x1="88"
+           y1="239"
+           x2="100"
+           y2="239"
+           id="line47" />
+        <line
+           x1="88"
+           y1="251"
+           x2="108"
+           y2="251"
+           id="line48" />
+        <line
+           x1="88"
+           y1="263"
+           x2="100"
+           y2="263"
+           id="line49" />
+        <line
+           x1="88"
+           y1="275"
+           x2="108"
+           y2="275"
+           id="line50" />
+        <line
+           x1="88"
+           y1="287"
+           x2="100"
+           y2="287"
+           id="line51" />
+        <line
+           x1="88"
+           y1="299"
+           x2="108"
+           y2="299"
+           id="line52" />
+        <line
+           x1="88"
+           y1="311"
+           x2="100"
+           y2="311"
+           id="line53" />
+        <line
+           x1="88"
+           y1="323"
+           x2="108"
+           y2="323"
+           id="line54" />
+        <line
+           x1="88"
+           y1="335"
+           x2="100"
+           y2="335"
+           id="line55" />
+        <line
+           x1="88"
+           y1="347"
+           x2="108"
+           y2="347"
+           id="line56" />
+        <line
+           x1="88"
+           y1="359"
+           x2="100"
+           y2="359"
+           id="line57" />
+        <line
+           x1="88"
+           y1="371"
+           x2="108"
+           y2="371"
+           id="line58" />
+      </g>
+      <!-- Marcas de medición horizontales -->
+      <g
+         stroke="#455661"
+         stroke-width="2"
+         stroke-linecap="round"
+         id="g72">
+        <line
+           x1="138"
+           y1="416"
+           x2="138"
+           y2="396"
+           id="line59" />
+        <line
+           x1="150"
+           y1="416"
+           x2="150"
+           y2="404"
+           id="line60" />
+        <line
+           x1="162"
+           y1="416"
+           x2="162"
+           y2="396"
+           id="line61" />
+        <line
+           x1="174"
+           y1="416"
+           x2="174"
+           y2="404"
+           id="line62" />
+        <line
+           x1="186"
+           y1="416"
+           x2="186"
+           y2="396"
+           id="line63" />
+        <line
+           x1="198"
+           y1="416"
+           x2="198"
+           y2="404"
+           id="line64" />
+        <line
+           x1="210"
+           y1="416"
+           x2="210"
+           y2="396"
+           id="line65" />
+        <line
+           x1="222"
+           y1="416"
+           x2="222"
+           y2="404"
+           id="line66" />
+        <line
+           x1="234"
+           y1="416"
+           x2="234"
+           y2="396"
+           id="line67" />
+        <line
+           x1="246"
+           y1="416"
+           x2="246"
+           y2="404"
+           id="line68" />
+        <line
+           x1="258"
+           y1="416"
+           x2="258"
+           y2="396"
+           id="line69" />
+        <line
+           x1="270"
+           y1="416"
+           x2="270"
+           y2="404"
+           id="line70" />
+        <line
+           x1="282"
+           y1="416"
+           x2="282"
+           y2="396"
+           id="line71" />
+        <line
+           x1="294"
+           y1="416"
+           x2="294"
+           y2="404"
+           id="line72" />
+      </g>
+    </g>
+    <g
+       id="g77"
+       transform="rotate(-44.836344,309.05201,303.60182)">
+      <g
+         transform="rotate(-45,409.09903,-219.45436)"
+         id="g28">
+        <!-- Sombra vectorial suave debajo de la mesa -->
+        <rect
+           x="-112"
+           y="-104"
+           width="224"
+           height="224"
+           rx="18"
+           fill="#0b1c13"
+           opacity="0.5"
+           id="rect11" />
+        <!-- Marco exterior de madera -->
+        <rect
+           x="-112"
+           y="-112"
+           width="224"
+           height="224"
+           rx="18"
+           fill="url(#woodGrad)"
+           stroke="#2b1b15"
+           stroke-width="2"
+           id="rect12"
+           style="fill:url(#woodGrad)" />
+        <!-- Bisel interior de las bandas -->
+        <rect
+           x="-92"
+           y="-92"
+           width="184"
+           height="184"
+           rx="8"
+           fill="#2c566e"
+           id="rect13" />
+        <!-- Paño azul continuo -->
+        <rect
+           x="-84"
+           y="-84"
+           width="168"
+           height="168"
+           rx="4"
+           fill="url(#clothGrad)"
+           id="rect14"
+           style="fill:url(#clothGrad)" />
+        <!-- Sombras e iluminaciones de las 4 bandas continuas -->
+        <path
+           d="m -84,-76 -8,-8 V 84 l 8,-8 z"
+           fill="#3e7291"
+           opacity="0.7"
+           id="path14" />
+        <path
+           d="m 84,-76 8,-8 V 84 l -8,-8 z"
+           fill="#264b61"
+           opacity="0.7"
+           id="path15" />
+        <path
+           d="m -76,-84 -8,-8 H 84 l -8,8 z"
+           fill="#467fa1"
+           opacity="0.7"
+           id="path16" />
+        <path
+           d="m -76,84 -8,8 H 84 l -8,-8 z"
+           fill="#224357"
+           opacity="0.7"
+           id="path17" />
+        <!-- Diamantes de referencia en los 4 rieles (3 por banda) -->
+        <!-- Banda Superior -->
+        <polygon
+           points="-45,-99 -42,-102 -39,-99 -42,-96 "
+           fill="#e8ecef"
+           id="polygon17" />
+        <polygon
+           points="-3,-99 0,-102 3,-99 0,-96 "
+           fill="#e8ecef"
+           id="polygon18" />
+        <polygon
+           points="39,-99 42,-102 45,-99 42,-96 "
+           fill="#e8ecef"
+           id="polygon19" />
+        <!-- Banda Inferior -->
+        <polygon
+           points="-45,99 -42,96 -39,99 -42,102 "
+           fill="#e8ecef"
+           id="polygon20" />
+        <polygon
+           points="-3,99 0,96 3,99 0,102 "
+           fill="#e8ecef"
+           id="polygon21" />
+        <polygon
+           points="39,99 42,96 45,99 42,102 "
+           fill="#e8ecef"
+           id="polygon22" />
+        <!-- Banda Izquierda -->
+        <polygon
+           points="-99,-39 -102,-42 -99,-45 -96,-42 "
+           fill="#e8ecef"
+           id="polygon23" />
+        <polygon
+           points="-99,3 -102,0 -99,-3 -96,0 "
+           fill="#e8ecef"
+           id="polygon24" />
+        <polygon
+           points="-99,45 -102,42 -99,39 -96,42 "
+           fill="#e8ecef"
+           id="polygon25" />
+        <!-- Banda Derecha -->
+        <polygon
+           points="99,-39 96,-42 99,-45 102,-42 "
+           fill="#e8ecef"
+           id="polygon26" />
+        <polygon
+           points="99,3 96,0 99,-3 102,0 "
+           fill="#e8ecef"
+           id="polygon27" />
+        <polygon
+           points="99,45 96,42 99,39 102,42 "
+           fill="#e8ecef"
+           id="polygon28" />
+      </g>
+      <g
+         fill="none"
+         stroke="#f2f5f7"
+         stroke-width="3.2"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         id="g31">
+        <path
+           d="m 225,205 q -35,25 -27,53 l 67,64 63,-57"
+           stroke-dasharray="6, 6"
+           id="path28" />
+        <path
+           d="M 198,258 320,205"
+           stroke-dasharray="6, 6"
+           id="path29" />
+        <path
+           d="m 317,265 12,-1 -2,12"
+           id="path30" />
+        <path
+           d="m 271,218 10,4 -6,9"
+           id="path31" />
+      </g>
+      <g
+         transform="translate(225,200)"
+         id="g35">
+        <circle
+           cx="2"
+           cy="4"
+           r="16"
+           fill="#17384d"
+           opacity="0.4"
+           id="circle31" />
+        <circle
+           cx="0"
+           cy="0"
+           r="16"
+           fill="#f7f4eb"
+           id="circle32" />
+        <path
+           d="M -11,11 A 16,16 0 0 0 11,-11 15.556349,15.556349 0 0 1 -11,11 Z"
+           fill="#dfd9c8"
+           id="path32" />
+        <circle
+           cx="-6"
+           cy="-5"
+           r="2.3"
+           fill="#d63a2f"
+           id="circle33" />
+        <circle
+           cx="7"
+           cy="-3"
+           r="2.3"
+           fill="#d63a2f"
+           id="circle34" />
+        <circle
+           cx="-1"
+           cy="8"
+           r="2.3"
+           fill="#d63a2f"
+           id="circle35" />
+        <ellipse
+           cx="-5"
+           cy="-7"
+           rx="3.5"
+           ry="2"
+           transform="rotate(-35,-5,-7)"
+           fill="#ffffff"
+           opacity="0.85"
+           id="ellipse35" />
+      </g>
+      <g
+         transform="translate(275,165)"
+         id="g40">
+        <circle
+           cx="2"
+           cy="4"
+           r="16"
+           fill="#17384d"
+           opacity="0.4"
+           id="circle36" />
+        <circle
+           cx="0"
+           cy="0"
+           r="16"
+           fill="#f5b82e"
+           id="circle37" />
+        <path
+           d="M -11,11 A 16,16 0 0 0 11,-11 15.556349,15.556349 0 0 1 -11,11 Z"
+           fill="#d99b18"
+           id="path37" />
+        <circle
+           cx="0"
+           cy="-7"
+           r="2.3"
+           fill="#d63a2f"
+           id="circle38" />
+        <circle
+           cx="-7"
+           cy="5"
+           r="2.3"
+           fill="#d63a2f"
+           id="circle39" />
+        <circle
+           cx="7"
+           cy="5"
+           r="2.3"
+           fill="#d63a2f"
+           id="circle40" />
+        <ellipse
+           cx="-5"
+           cy="-7"
+           rx="3.5"
+           ry="2"
+           transform="rotate(-35,-5,-7)"
+           fill="#ffffff"
+           opacity="0.7"
+           id="ellipse40" />
+      </g>
+      <g
+         transform="translate(310,250)"
+         id="g42">
+        <circle
+           cx="2"
+           cy="4"
+           r="16"
+           fill="#17384d"
+           opacity="0.4"
+           id="circle41" />
+        <circle
+           cx="0"
+           cy="0"
+           r="16"
+           fill="#d63a2f"
+           id="circle42" />
+        <path
+           d="M -11,11 A 16,16 0 0 0 11,-11 15.556349,15.556349 0 0 1 -11,11 Z"
+           fill="#ad261d"
+           id="path42" />
+        <ellipse
+           cx="-5"
+           cy="-7"
+           rx="3.5"
+           ry="2"
+           transform="rotate(-35,-5,-7)"
+           fill="#ffffff"
+           opacity="0.65"
+           id="ellipse42" />
+      </g>
+    </g>
+  </g>
+</svg>

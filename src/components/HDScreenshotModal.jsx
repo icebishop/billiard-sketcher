@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Camera, Download, Copy, Check, X, Sliders, Image, Sparkles, Monitor, Type, Layers, Eye
 } from 'lucide-react';
-import { renderDiagramToCanvas, downloadHDDiagram, copyHDDiagramToClipboard } from '../utils/hdRender';
+import { renderDiagramToCanvas, downloadHDDiagram, copyHDDiagramToClipboard, downloadSVGDiagram } from '../utils/hdRender';
 
 const RESOLUTION_PRESETS = [
   { id: '1080p', name: 'Full HD 1080p', width: 1920, height: 960, badge: 'Recomendado', megapixels: '1.8 MP' },
@@ -15,6 +15,7 @@ const FORMAT_OPTIONS = [
   { id: 'image/png',  label: 'PNG',  desc: 'Calidad original sin pérdida' },
   { id: 'image/webp', label: 'WebP', desc: 'Súper liviano para web' },
   { id: 'image/jpeg', label: 'JPEG', desc: 'Compatibilidad universal' },
+  { id: 'image/svg+xml', label: 'SVG', desc: 'Vector HD infinitamente escalable' },
 ];
 
 export default function HDScreenshotModal({
@@ -91,22 +92,38 @@ export default function HDScreenshotModal({
     setIsProcessing(true);
     try {
       const diagramData = getDiagramData();
-      await downloadHDDiagram(diagramData, {
-        width: targetWidth,
-        height: targetHeight,
-        format: selectedFormat,
-        showHeader,
-        titleText,
-        subtitleText,
-        showWatermark,
-        watermarkText,
-        showStrikeWidget,
-        resolutionLabel: isCustomMode ? `${customScale}x` : preset.id,
-      });
-      showToast('¡Captura HD descargada con éxito!');
+
+      if (selectedFormat === 'image/svg+xml') {
+        downloadSVGDiagram(diagramData, {
+          width: targetWidth,
+          height: targetHeight,
+          showHeader,
+          titleText,
+          subtitleText,
+          showWatermark,
+          watermarkText,
+          showStrikeWidget,
+          resolutionLabel: isCustomMode ? `${customScale}x` : preset.id,
+        });
+        showToast('¡Diagrama SVG descargado con éxito!');
+      } else {
+        await downloadHDDiagram(diagramData, {
+          width: targetWidth,
+          height: targetHeight,
+          format: selectedFormat,
+          showHeader,
+          titleText,
+          subtitleText,
+          showWatermark,
+          watermarkText,
+          showStrikeWidget,
+          resolutionLabel: isCustomMode ? `${customScale}x` : preset.id,
+        });
+        showToast('¡Captura HD descargada con éxito!');
+      }
     } catch (err) {
-      console.error('Error al exportar captura HD:', err);
-      showToast('Error al generar la captura HD.');
+      console.error('Error al exportar:', err);
+      showToast('Error al generar la exportación.');
     } finally {
       setIsProcessing(false);
     }
@@ -473,15 +490,25 @@ export default function HDScreenshotModal({
                 boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8)',
               }}
             >
-              <canvas
-                ref={previewCanvasRef}
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '220px',
-                  display: 'block',
-                  objectFit: 'contain',
-                }}
-              />
+              {selectedFormat === 'image/svg+xml' ? (
+                <div style={{ padding: '32px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>⬡</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#38bdf8', marginBottom: 4 }}>Formato vectorial SVG</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>
+                    La vista previa no aplica — el archivo generado es infinitamente escalable.
+                  </div>
+                </div>
+              ) : (
+                <canvas
+                  ref={previewCanvasRef}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '220px',
+                    display: 'block',
+                    objectFit: 'contain',
+                  }}
+                />
+              )}
             </div>
           </div>
 
@@ -549,7 +576,7 @@ export default function HDScreenshotModal({
               }}
             >
               <Download size={16} />
-              {isProcessing ? 'Procesando HD...' : `Descargar ${isCustomMode ? `${customScale}x` : preset.id}`}
+              {isProcessing ? 'Procesando...' : selectedFormat === 'image/svg+xml' ? `Descargar SVG` : `Descargar ${isCustomMode ? `${customScale}x` : preset.id}`}
             </button>
           </div>
         </div>
