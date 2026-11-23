@@ -3,6 +3,7 @@ import {
   Move, PenTool, ArrowUpRight, CircleDot, Type, Eraser,
   Download, RotateCcw, CheckCircle, Trash2,
   Film, Camera, Clock, Crosshair, Save, FolderOpen,
+  MoreHorizontal,
 } from 'lucide-react';
 
 /* ── Preset color palette ── */
@@ -59,6 +60,8 @@ export default function Toolbar({
   frameCount,
   strikeMode,
   onToggleStrikeMode,
+  showDetailedPoints,
+  onToggleDetailedPoints,
   onOpenHDModal,
 }) {
   const tools = [
@@ -237,6 +240,21 @@ export default function Toolbar({
         >
           <Crosshair size={15} strokeWidth={2.1} />
           <span className="tb-tool-label">Toma/Efecto</span>
+        </button>
+      </div>
+
+      {/* ── Section: Detailed Points (Puntos Detallados 1/10) ── */}
+      <Sep />
+      <div className="tb-group">
+        <button
+          id="btn-detailed-points"
+          onClick={onToggleDetailedPoints}
+          title="Puntos detallados (1/10) — activa puntos intermedios a décimas en las bandas"
+          className={`tb-tool${showDetailedPoints ? ' active' : ''}`}
+          style={{ minWidth: 62 }}
+        >
+          <MoreHorizontal size={15} strokeWidth={2.4} />
+          <span className="tb-tool-label">Puntos 1/10</span>
         </button>
       </div>
 

@@ -48,6 +48,8 @@ export default function TableCanvas({
   setClothColor = () => {},
   showDiamonds = true,
   setShowDiamonds = () => {},
+  showDetailedPoints = false,
+  setShowDetailedPoints = () => {},
   showAlignmentGuides = true,
   setShowAlignmentGuides = () => {},
   strikeMode = false,
@@ -66,6 +68,8 @@ export default function TableCanvas({
   setTexts: setExternalTexts,
   textColor = '#f59e0b',
   setTextColor = () => { },
+  textSize = 'm',
+  setTextSize = () => { },
   selectedTextId = null,
   setSelectedTextId = () => { },
   onRegisterExportHandler,
@@ -115,7 +119,7 @@ export default function TableCanvas({
 
   // ── Canvas size — fills available space keeping 2:1 aspect ratio ──
   const containerRef = useRef(null);
-  const [dimensions, setDimensions] = useState({ width: 900, height: 450 });
+  const [dimensions, setDimensions] = useState({ width: 900, height: 499 });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -125,15 +129,16 @@ export default function TableCanvas({
       const availW = container.clientWidth  - 32; // inner padding
       const availH = container.clientHeight - 48; // room for hint bar
       if (availW <= 0 || availH <= 0) return;
-      // Fit 2:1 table into the available box
+      // Real 3-cushion table aspect ratio (3.19m x 1.77m total outer dimensions)
+      const TABLE_RATIO = 3190 / 1770; // ~1.80226
       let w = availW;
-      let h = w / 2;
+      let h = w / TABLE_RATIO;
       if (h > availH) {
         h = availH;
-        w = h * 2;
+        w = h * TABLE_RATIO;
       }
       w = Math.max(w, 320);
-      h = w / 2;
+      h = w / TABLE_RATIO;
       setDimensions({ width: Math.round(w), height: Math.round(h) });
     };
 
@@ -144,9 +149,13 @@ export default function TableCanvas({
   }, []);
 
   // ── Coordinate Helpers ───────────────────────────────────────
+  // Based on official UMB specs:
+  // Playing field: 2840mm x 1420mm (exact 2:1)
+  // Total border: 175mm on each side (50mm cushion + 125mm wood rail)
+  // Outer table: 3190mm x 1770mm
   const normToPx = useCallback((nx, ny) => {
-    const marginX = dimensions.width * 0.045;
-    const marginY = dimensions.height * 0.09;
+    const marginX = dimensions.width * (175 / 3190);
+    const marginY = dimensions.height * (175 / 1770);
     const playWidth = dimensions.width - marginX * 2;
     const playHeight = dimensions.height - marginY * 2;
     const ballRadius = Math.max(6, playWidth * (30.75 / 2840));
@@ -158,8 +167,8 @@ export default function TableCanvas({
   }, [dimensions]);
 
   const pxToNorm = useCallback((px, py) => {
-    const marginX = dimensions.width * 0.045;
-    const marginY = dimensions.height * 0.09;
+    const marginX = dimensions.width * (175 / 3190);
+    const marginY = dimensions.height * (175 / 1770);
     const playWidth = dimensions.width - marginX * 2;
     const playHeight = dimensions.height - marginY * 2;
     // Normalized bounds that also cover the wooden bands (rails).
@@ -184,13 +193,24 @@ export default function TableCanvas({
     const targets = [];
 
     // 1. Diamond alignment targets
-    for (let i = 0; i <= 8; i++) {
-      targets.push({ id: `d-top-${i}`, x: i / 8, y: 0 });
-      targets.push({ id: `d-bot-${i}`, x: i / 8, y: 1 });
-    }
-    for (let j = 0; j <= 4; j++) {
-      targets.push({ id: `d-left-${j}`, x: 0, y: j / 4 });
-      targets.push({ id: `d-right-${j}`, x: 1, y: j / 4 });
+    if (showDetailedPoints) {
+      for (let i = 0; i <= 16; i++) {
+        targets.push({ id: `d-top-${i}`, x: i / 16, y: 0 });
+        targets.push({ id: `d-bot-${i}`, x: i / 16, y: 1 });
+      }
+      for (let j = 0; j <= 8; j++) {
+        targets.push({ id: `d-left-${j}`, x: 0, y: j / 8 });
+        targets.push({ id: `d-right-${j}`, x: 1, y: j / 8 });
+      }
+    } else {
+      for (let i = 0; i <= 8; i++) {
+        targets.push({ id: `d-top-${i}`, x: i / 8, y: 0 });
+        targets.push({ id: `d-bot-${i}`, x: i / 8, y: 1 });
+      }
+      for (let j = 0; j <= 4; j++) {
+        targets.push({ id: `d-left-${j}`, x: 0, y: j / 4 });
+        targets.push({ id: `d-right-${j}`, x: 1, y: j / 4 });
+      }
     }
 
     // 2. Points (excluding current point being moved)
@@ -249,7 +269,7 @@ export default function TableCanvas({
     }
 
     return { snappedNx, snappedNy, guides };
-  }, [showAlignmentGuides, points, texts, normToPx]);
+  }, [showAlignmentGuides, showDetailedPoints, points, texts, normToPx]);
 
   // ── Line Actions ─────────────────────────────────────────────
   const finishCurrentLine = useCallback(() => {
@@ -305,11 +325,19 @@ export default function TableCanvas({
 
     ctx.clearRect(0, 0, width, height);
 
-    const marginX = width * 0.045;
-    const marginY = height * 0.09;
+    const marginX = width * (175 / 3190);
+    const marginY = height * (175 / 1770);
     const playWidth = width - marginX * 2;
     const playHeight = height - marginY * 2;
     const ballRadius = Math.max(6, playWidth * (30.75 / 2840));
+
+    // Real table components:
+    // 50mm rubber cushion out of 175mm total border = 50 / 175
+    // 125mm wooden rail: center of rail from outer edge = 62.5 / 175
+    const cushionW = marginX * (50 / 175);
+    const cushionH = marginY * (50 / 175);
+    const railCenterX = marginX * (62.5 / 175);
+    const railCenterY = marginY * (62.5 / 175);
 
     // 1. Outer wooden rail
     ctx.fillStyle = getRailColor(clothColor);
@@ -319,23 +347,75 @@ export default function TableCanvas({
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fillRect(0, height - 6, width, 6);
 
-    // 2. Cloth
+    // 2. Rubber cushion band (wrapped in cloth, with natural bevel depth shading)
+    ctx.fillStyle = clothColor;
+    ctx.fillRect(marginX - cushionW, marginY - cushionH, playWidth + cushionW * 2, playHeight + cushionH * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillRect(marginX - cushionW, marginY - cushionH, playWidth + cushionW * 2, playHeight + cushionH * 2);
+
+    // 3. Flat playing surface (pizarra / paño de juego)
     ctx.fillStyle = clothColor;
     ctx.fillRect(marginX, marginY, playWidth, playHeight);
-    ctx.strokeStyle = '#052b1b';
-    ctx.lineWidth = Math.max(2, playWidth * 0.005);
+
+    // Cushion nose bevel (arista de rebote)
+    ctx.strokeStyle = 'rgba(0,0,0,0.50)';
+    ctx.lineWidth = Math.max(1.5, playWidth * 0.0025);
     ctx.setLineDash([]);
     ctx.strokeRect(marginX, marginY, playWidth, playHeight);
 
-    // Cushion bevels
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.fillRect(marginX - 4, marginY - 4, playWidth + 8, 4);
-    ctx.fillRect(marginX - 4, marginY + playHeight, playWidth + 8, 4);
-    ctx.fillRect(marginX - 4, marginY - 4, 4, playHeight + 8);
-    ctx.fillRect(marginX + playWidth, marginY - 4, 4, playHeight + 8);
+    // Corner mitre lines (corte a 45° en las esquinas de las bandas)
+    ctx.strokeStyle = 'rgba(0,0,0,0.38)';
+    ctx.lineWidth = Math.max(1, playWidth * 0.0018);
+    ctx.beginPath();
+    ctx.moveTo(marginX - cushionW, marginY - cushionH);
+    ctx.lineTo(marginX, marginY);
+    ctx.moveTo(marginX + playWidth + cushionW, marginY - cushionH);
+    ctx.lineTo(marginX + playWidth, marginY);
+    ctx.moveTo(marginX - cushionW, marginY + playHeight + cushionH);
+    ctx.lineTo(marginX, marginY + playHeight);
+    ctx.moveTo(marginX + playWidth + cushionW, marginY + playHeight + cushionH);
+    ctx.lineTo(marginX + playWidth, marginY + playHeight);
+    ctx.stroke();
 
-    // 3. Diamond markers
-    if (showDiamonds) {
+    // 3. Diamond markers & Detailed points (centered in 125mm wooden rail)
+    if (showDetailedPoints) {
+      const dr = Math.max(3, playWidth * 0.004);
+      const rMajor = Math.max(3.6, dr * 0.95);
+      const rHalf  = Math.max(2.2, dr * 0.58);
+      const rTenth = Math.max(1.3, dr * 0.35);
+
+      const drawDot = (cx, cy, r, lw) => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fill();
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = lw;
+        ctx.stroke();
+      };
+
+      // Long rails: 80 subdivisions (8 diamonds * 10)
+      for (let k = 0; k <= 80; k++) {
+        const x = marginX + (k / 80) * playWidth;
+        const isMajor = k % 10 === 0;
+        const isHalf  = k % 5 === 0;
+        const r  = isMajor ? rMajor : isHalf ? rHalf : rTenth;
+        const lw = isMajor ? 1 : isHalf ? 0.8 : 0.6;
+        drawDot(x, railCenterY, r, lw);
+        drawDot(x, height - railCenterY, r, lw);
+      }
+
+      // Short rails: 40 subdivisions (4 diamonds * 10)
+      for (let k = 0; k <= 40; k++) {
+        const y = marginY + (k / 40) * playHeight;
+        const isMajor = k % 10 === 0;
+        const isHalf  = k % 5 === 0;
+        const r  = isMajor ? rMajor : isHalf ? rHalf : rTenth;
+        const lw = isMajor ? 1 : isHalf ? 0.8 : 0.6;
+        drawDot(railCenterX, y, r, lw);
+        drawDot(width - railCenterX, y, r, lw);
+      }
+    } else if (showDiamonds) {
       const dr = Math.max(3, playWidth * 0.004);
       ctx.fillStyle = '#f8fafc';
       ctx.strokeStyle = '#1e293b';
@@ -351,12 +431,12 @@ export default function TableCanvas({
         ctx.stroke();
       };
       for (let i = 0; i <= 8; i++) {
-        drawDiamond(marginX + (i / 8) * playWidth, marginY / 2);
-        drawDiamond(marginX + (i / 8) * playWidth, height - marginY / 2);
+        drawDiamond(marginX + (i / 8) * playWidth, railCenterY);
+        drawDiamond(marginX + (i / 8) * playWidth, height - railCenterY);
       }
       for (let j = 0; j <= 4; j++) {
-        drawDiamond(marginX / 2, marginY + (j / 4) * playHeight);
-        drawDiamond(width - marginX / 2, marginY + (j / 4) * playHeight);
+        drawDiamond(railCenterX, marginY + (j / 4) * playHeight);
+        drawDiamond(width - railCenterX, marginY + (j / 4) * playHeight);
       }
     }
 
@@ -568,9 +648,12 @@ export default function TableCanvas({
     }
 
     // 6. Text annotations (direct clean text with NO background color box)
+    const TEXT_SIZE_SCALES = { xs: 0.55, s: 0.75, m: 1.0, l: 1.4, xl: 1.9 };
     texts.forEach((t) => {
-      const pt       = normToPx(t.x, t.y);
-      const fontSize = Math.max(12, Math.round(playWidth * 0.015));
+      const pt        = normToPx(t.x, t.y);
+      const sizeKey   = t.size ?? textSize ?? 'm';
+      const sizeScale = TEXT_SIZE_SCALES[sizeKey] ?? 1.0;
+      const fontSize  = Math.max(12, Math.round(playWidth * 0.015 * sizeScale));
       const isSelected = t.id === selectedTextId && !captureModeRef.current;
       const col = t.color || textColor || '#f59e0b';
 
@@ -808,7 +891,7 @@ export default function TableCanvas({
       ctx.setLineDash([]);
       ctx.restore();
     }
-  }, [dimensions, clothColor, showDiamonds, showAlignmentGuides, activeGuides, balls, lines, texts, points, pointRadius, pointColor, selectedPointId, selectedTextId,
+  }, [dimensions, clothColor, showDiamonds, showDetailedPoints, showAlignmentGuides, activeGuides, balls, lines, texts, points, pointRadius, pointColor, selectedPointId, selectedTextId,
     currentLinePoints, mousePreviewPoint,
     selectedLineId, activeTool, normToPx, draggingVertex,
     strikeMode, spin, strike]);
@@ -823,6 +906,29 @@ export default function TableCanvas({
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
     const { nx, ny } = pxToNorm(px, py);
+
+    // ── Shared text hit-box helper (uses actual font metrics) ──
+    // Mirrors the same fontSize formula used in the render loop.
+    const textHitBox = (t) => {
+      const { x: cx, y: cy, playWidth: pw } = normToPx(t.x, t.y);
+      const TEXT_SIZE_SCALES = { xs: 0.55, s: 0.75, m: 1.0, l: 1.4, xl: 1.9 };
+      const sizeScale = TEXT_SIZE_SCALES[t.size ?? textSize ?? 'm'] ?? 1.0;
+      const fontSize  = Math.max(12, Math.round(pw * 0.015 * sizeScale));
+      // Approximate glyph width: use a generous char-width estimate (0.65×fontSize per char)
+      const approxW = Math.max(40, t.text.length * fontSize * 0.65) + 10;
+      const approxH = fontSize + 6;
+      return {
+        left:   cx - approxW / 2,
+        right:  cx + approxW / 2,
+        top:    cy - approxH / 2,
+        bottom: cy + approxH / 2,
+      };
+    };
+
+    const hitsText = (t) => {
+      const b = textHitBox(t);
+      return px >= b.left && px <= b.right && py >= b.top && py <= b.bottom;
+    };
 
     // ── Point tool ──
     if (activeTool === 'point') {
@@ -843,7 +949,18 @@ export default function TableCanvas({
 
     // ── Move tool ──
     if (activeTool === 'move') {
-      // Priority 1: vertex of selected line
+      // Priority 1: text annotations (checked FIRST so they win over shapes beneath)
+      for (const t of texts) {
+        if (hitsText(t)) {
+          setDraggingText(t.id);
+          setSelectedTextId(t.id);
+          setSelectedLineId(null);
+          setSelectedPointId(null);
+          return;
+        }
+      }
+
+      // Priority 2: vertex of selected line
       if (selectedLineId) {
         const selLine = lines.find(l => l.id === selectedLineId);
         if (selLine) {
@@ -857,7 +974,7 @@ export default function TableCanvas({
         }
       }
 
-      // Priority 1.5: points placed on table or bands
+      // Priority 3: points placed on table or bands
       for (const p of points) {
         const ppt = normToPx(p.x, p.y);
         const pr = Math.max(10, (p.radius || pointRadius || 8) * (dimensions.width / 900) + 4);
@@ -870,19 +987,7 @@ export default function TableCanvas({
         }
       }
 
-      // Priority 2: text annotations
-      for (const t of texts) {
-        const tpt = normToPx(t.x, t.y);
-        if (Math.hypot(px - tpt.x, py - tpt.y) <= 24) {
-          setDraggingText(t.id);
-          setSelectedTextId(t.id);
-          setSelectedLineId(null);
-          setSelectedPointId(null);
-          return;
-        }
-      }
-
-      // Priority 2.5: balls
+      // Priority 4: balls
       for (const key of ['white', 'yellow', 'red']) {
         const bpt = normToPx(balls[key].x, balls[key].y);
         if (Math.hypot(px - bpt.x, py - bpt.y) <= 24) {
@@ -894,7 +999,7 @@ export default function TableCanvas({
         }
       }
 
-      // Priority 3: line segment → select
+      // Priority 5: line segment → select
       for (const line of lines) {
         for (let i = 0; i < line.points.length - 1; i++) {
           const p1 = normToPx(line.points[i].x, line.points[i].y);
@@ -941,6 +1046,7 @@ export default function TableCanvas({
           y: snappedNy,
           text: labelText.trim(),
           color: textColor || '#f59e0b',
+          size: textSize || 'm',
         };
         setTexts(prev => [...prev, newText]);
         setSelectedTextId(newText.id);
@@ -966,10 +1072,7 @@ export default function TableCanvas({
       }
 
       // Check text annotations
-      const hitIdx = texts.findIndex(t => {
-        const tpt = normToPx(t.x, t.y);
-        return Math.hypot(px - tpt.x, py - tpt.y) < 24;
-      });
+      const hitIdx = texts.findIndex(t => hitsText(t));
       if (hitIdx !== -1) {
         const targetId = texts[hitIdx]?.id;
         setTexts(prev => prev.filter(t => t.id !== targetId));
@@ -978,7 +1081,7 @@ export default function TableCanvas({
       }
       if (lines.length > 0) setLines(prev => prev.slice(0, -1));
     }
-  }, [activeTool, selectedLineId, selectedPointId, selectedTextId, lines, balls, currentLinePoints, texts, points, pointRadius, pointColor, textColor, normToPx, pxToNorm, getSnapGuides, setPoints, setSelectedPointId, setTexts, setSelectedTextId]);
+  }, [activeTool, selectedLineId, selectedPointId, selectedTextId, lines, balls, currentLinePoints, texts, points, pointRadius, pointColor, textColor, textSize, normToPx, pxToNorm, getSnapGuides, setPoints, setSelectedPointId, setTexts, setSelectedTextId]);
 
   const handlePointerMove = useCallback((e) => {
     const canvas = canvasRef.current;
@@ -1080,9 +1183,10 @@ export default function TableCanvas({
     renderDiagramToCanvas({
       canvas: hdCanvas,
       width: 1920,
-      height: 960,
+      height: 1066,
       clothColor,
       showDiamonds,
+      showDetailedPoints,
       balls,
       lines: activeLines,
       points,
@@ -1102,7 +1206,7 @@ export default function TableCanvas({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, balls, points, texts, strikeMode, spin, strike]);
+  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, showDetailedPoints, balls, points, texts, strikeMode, spin, strike]);
 
   useEffect(() => {
     if (onRegisterExportHandler) onRegisterExportHandler(() => exportPNG);
@@ -1133,9 +1237,10 @@ export default function TableCanvas({
     renderDiagramToCanvas({
       canvas: hdCanvas,
       width: 1920,
-      height: 960,
+      height: 1066,
       clothColor,
       showDiamonds,
+      showDetailedPoints,
       balls,
       lines: activeLines,
       points,
@@ -1154,9 +1259,9 @@ export default function TableCanvas({
     return {
       dataUrl,
       width: 1920,
-      height: 960,
+      height: 1066,
     };
-  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, balls, points, texts, strikeMode, spin, strike]);
+  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, showDetailedPoints, balls, points, texts, strikeMode, spin, strike]);
 
   useEffect(() => {
     if (onRegisterCaptureHandler) onRegisterCaptureHandler(() => captureFrame);
@@ -1171,6 +1276,7 @@ export default function TableCanvas({
       table: {
         clothColor,
         showDiamonds,
+        showDetailedPoints,
         showAlignmentGuides,
       },
       balls,
@@ -1183,7 +1289,7 @@ export default function TableCanvas({
         strikeMode,
       },
     };
-  }, [clothColor, showDiamonds, showAlignmentGuides, balls, lines, points, texts, spin, strike, strikeMode]);
+  }, [clothColor, showDiamonds, showDetailedPoints, showAlignmentGuides, balls, lines, points, texts, spin, strike, strikeMode]);
 
   const loadDiagramData = useCallback((data) => {
     if (!data) return;
@@ -1193,11 +1299,12 @@ export default function TableCanvas({
     if (data.texts) setTexts(data.texts);
     if (data.table?.clothColor) setClothColor(data.table.clothColor);
     if (data.table?.showDiamonds !== undefined) setShowDiamonds(data.table.showDiamonds);
+    if (data.table?.showDetailedPoints !== undefined) setShowDetailedPoints(data.table.showDetailedPoints);
     if (data.table?.showAlignmentGuides !== undefined) setShowAlignmentGuides(data.table.showAlignmentGuides);
     if (data.strike?.spin) setSpin(data.strike.spin);
     if (data.strike?.strike !== undefined) setStrike(data.strike.strike);
     if (data.strike?.strikeMode !== undefined) setStrikeMode(data.strike.strikeMode);
-  }, [setPoints, setTexts, setClothColor, setShowDiamonds, setShowAlignmentGuides, setSpin, setStrike, setStrikeMode]);
+  }, [setPoints, setTexts, setClothColor, setShowDiamonds, setShowDetailedPoints, setShowAlignmentGuides, setSpin, setStrike, setStrikeMode]);
 
   useEffect(() => {
     if (onRegisterJsonHandler) {

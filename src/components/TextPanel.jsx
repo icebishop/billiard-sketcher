@@ -1,6 +1,14 @@
 import React from 'react';
 import { Type, Trash2, Plus, RotateCcw, Check, MousePointer, Edit3 } from 'lucide-react';
 
+const TEXT_SIZES = [
+  { id: 'xs', label: 'XS', scale: 0.55 },
+  { id: 's',  label: 'S',  scale: 0.75 },
+  { id: 'm',  label: 'M',  scale: 1.00 },
+  { id: 'l',  label: 'L',  scale: 1.40 },
+  { id: 'xl', label: 'XL', scale: 1.90 },
+];
+
 const TEXT_COLORS = [
   { hex: '#f59e0b', name: 'Ámbar'   },
   { hex: '#06b6d4', name: 'Cian'    },
@@ -15,6 +23,8 @@ const TEXT_COLORS = [
 export default function TextPanel({
   textColor,
   setTextColor,
+  textSize = 'm',
+  setTextSize = () => {},
   texts,
   setTexts,
   selectedTextId,
@@ -24,11 +34,19 @@ export default function TextPanel({
 }) {
   const selectedText = texts.find(t => t.id === selectedTextId);
   const activeColor  = selectedText ? selectedText.color : textColor;
+  const activeSize   = selectedText?.size ?? textSize;
 
   const handleColorChange = (newColor) => {
     setTextColor(newColor);
     if (selectedTextId) {
       setTexts(prev => prev.map(t => (t.id === selectedTextId ? { ...t, color: newColor } : t)));
+    }
+  };
+
+  const handleSizeChange = (newSize) => {
+    setTextSize(newSize);
+    if (selectedTextId) {
+      setTexts(prev => prev.map(t => (t.id === selectedTextId ? { ...t, size: newSize } : t)));
     }
   };
 
@@ -179,6 +197,47 @@ export default function TextPanel({
           Haz clic en la mesa para ingresar texto.
         </div>
       )}
+
+      {/* ── Text Size Radio Bar ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600 }}>TAMAÑO DEL TEXTO</span>
+        <div
+          style={{
+            display: 'flex',
+            borderRadius: 'var(--radius-sm)',
+            overflow: 'hidden',
+            border: '1px solid var(--border)',
+            background: 'rgba(0,0,0,0.3)',
+          }}
+        >
+          {TEXT_SIZES.map(({ id, label }) => {
+            const isActive = activeSize === id;
+            return (
+              <button
+                key={id}
+                onClick={() => handleSizeChange(id)}
+                title={`Tamaño ${label}`}
+                style={{
+                  flex: 1,
+                  padding: '5px 0',
+                  border: 'none',
+                  borderRight: id !== 'xl' ? '1px solid var(--border)' : 'none',
+                  background: isActive ? 'rgba(245,158,11,0.22)' : 'transparent',
+                  color: isActive ? 'var(--amber)' : 'var(--text-muted)',
+                  fontSize: 11,
+                  fontWeight: isActive ? 700 : 500,
+                  cursor: 'pointer',
+                  letterSpacing: '0.03em',
+                  transition: 'background 0.12s, color 0.12s',
+                  boxShadow: isActive ? 'inset 0 -2px 0 var(--amber)' : 'none',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* ── Text Color Picker ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

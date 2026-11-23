@@ -60,6 +60,7 @@ export function renderDiagramToCanvas({
   height,
   clothColor = '#0d5c3a',
   showDiamonds = true,
+  showDetailedPoints = false,
   balls = {
     white: { x: 0.25, y: 0.75, label: '1' },
     yellow: { x: 0.25, y: 0.25, label: '2' },
@@ -132,11 +133,18 @@ export function renderDiagramToCanvas({
 
   // Offset table drawing down by bannerHeight
   const tableTop = bannerHeight;
-  const marginX = width * 0.045;
-  const marginY = height * 0.09;
+  // Real 3-cushion table dimensions (2.84m x 1.42m playfield, 3.19m x 1.77m total exterior)
+  // Total border = 175mm (50mm rubber cushion + 125mm wooden frame)
+  const marginX = width * (175 / 3190);
+  const marginY = height * (175 / 1770);
   const playWidth = width - marginX * 2;
   const playHeight = height - marginY * 2;
-  const scale = playWidth / 819;
+  const scale = playWidth / 801;
+
+  const cushionW = marginX * (50 / 175);
+  const cushionH = marginY * (50 / 175);
+  const railCenterX = marginX * (62.5 / 175);
+  const railCenterY = marginY * (62.5 / 175);
 
   const normToPx = (nx, ny) => ({
     x: marginX + nx * playWidth,
@@ -156,25 +164,75 @@ export function renderDiagramToCanvas({
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.fillRect(0, tableTop + height - Math.max(4, height * 0.012), width, Math.max(4, height * 0.012));
 
-  // 2. Cloth
+  // 2. Rubber cushion band (wrapped in cloth, with natural bevel depth shading)
+  ctx.fillStyle = clothColor;
+  ctx.fillRect(marginX - cushionW, tableTop + marginY - cushionH, playWidth + cushionW * 2, playHeight + cushionH * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.fillRect(marginX - cushionW, tableTop + marginY - cushionH, playWidth + cushionW * 2, playHeight + cushionH * 2);
+
+  // 3. Flat playing surface (pizarra / paño de juego)
   ctx.fillStyle = clothColor;
   ctx.fillRect(marginX, tableTop + marginY, playWidth, playHeight);
 
-  ctx.strokeStyle = '#052b1b';
-  ctx.lineWidth = Math.max(2, playWidth * 0.005);
+  // Cushion nose bevel (arista de rebote)
+  ctx.strokeStyle = 'rgba(0,0,0,0.50)';
+  ctx.lineWidth = Math.max(1.5, playWidth * 0.0025);
   ctx.setLineDash([]);
   ctx.strokeRect(marginX, tableTop + marginY, playWidth, playHeight);
 
-  // Cushion bevels
-  const bevelW = Math.max(4, playWidth * 0.005);
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.fillRect(marginX - bevelW, tableTop + marginY - bevelW, playWidth + bevelW * 2, bevelW);
-  ctx.fillRect(marginX - bevelW, tableTop + marginY + playHeight, playWidth + bevelW * 2, bevelW);
-  ctx.fillRect(marginX - bevelW, tableTop + marginY - bevelW, bevelW, playHeight + bevelW * 2);
-  ctx.fillRect(marginX + playWidth, tableTop + marginY - bevelW, bevelW, playHeight + bevelW * 2);
+  // Corner mitre lines (corte a 45° en las esquinas de las bandas)
+  ctx.strokeStyle = 'rgba(0,0,0,0.38)';
+  ctx.lineWidth = Math.max(1, playWidth * 0.0018);
+  ctx.beginPath();
+  ctx.moveTo(marginX - cushionW, tableTop + marginY - cushionH);
+  ctx.lineTo(marginX, tableTop + marginY);
+  ctx.moveTo(marginX + playWidth + cushionW, tableTop + marginY - cushionH);
+  ctx.lineTo(marginX + playWidth, tableTop + marginY);
+  ctx.moveTo(marginX - cushionW, tableTop + marginY + playHeight + cushionH);
+  ctx.lineTo(marginX, tableTop + marginY + playHeight);
+  ctx.moveTo(marginX + playWidth + cushionW, tableTop + marginY + playHeight + cushionH);
+  ctx.lineTo(marginX + playWidth, tableTop + marginY + playHeight);
+  ctx.stroke();
 
-  // 3. Diamond markers
-  if (showDiamonds) {
+  // 3. Diamond markers & Detailed points (centered in 125mm wooden rail)
+  if (showDetailedPoints) {
+    const dr = Math.max(3 * scale, playWidth * 0.004);
+    const rMajor = Math.max(3.6 * scale, dr * 0.95);
+    const rHalf  = Math.max(2.2 * scale, dr * 0.58);
+    const rTenth = Math.max(1.3 * scale, dr * 0.35);
+
+    const drawDot = (cx, cy, r, lw) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fill();
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = lw;
+      ctx.stroke();
+    };
+
+    // Long rails: 80 subdivisions (8 diamonds * 10)
+    for (let k = 0; k <= 80; k++) {
+      const x = marginX + (k / 80) * playWidth;
+      const isMajor = k % 10 === 0;
+      const isHalf  = k % 5 === 0;
+      const r  = isMajor ? rMajor : isHalf ? rHalf : rTenth;
+      const lw = isMajor ? Math.max(1, scale * 0.8) : isHalf ? Math.max(0.8, scale * 0.7) : Math.max(0.6, scale * 0.5);
+      drawDot(x, tableTop + railCenterY, r, lw);
+      drawDot(x, tableTop + height - railCenterY, r, lw);
+    }
+
+    // Short rails: 40 subdivisions (4 diamonds * 10)
+    for (let k = 0; k <= 40; k++) {
+      const y = tableTop + marginY + (k / 40) * playHeight;
+      const isMajor = k % 10 === 0;
+      const isHalf  = k % 5 === 0;
+      const r  = isMajor ? rMajor : isHalf ? rHalf : rTenth;
+      const lw = isMajor ? Math.max(1, scale * 0.8) : isHalf ? Math.max(0.8, scale * 0.7) : Math.max(0.6, scale * 0.5);
+      drawDot(railCenterX, y, r, lw);
+      drawDot(width - railCenterX, y, r, lw);
+    }
+  } else if (showDiamonds) {
     const dr = Math.max(3 * scale, playWidth * 0.004);
     ctx.fillStyle = '#f8fafc';
     ctx.strokeStyle = '#1e293b';
@@ -190,12 +248,12 @@ export function renderDiagramToCanvas({
       ctx.stroke();
     };
     for (let i = 0; i <= 8; i++) {
-      drawDiamond(marginX + (i / 8) * playWidth, tableTop + marginY / 2);
-      drawDiamond(marginX + (i / 8) * playWidth, tableTop + height - marginY / 2);
+      drawDiamond(marginX + (i / 8) * playWidth, tableTop + railCenterY);
+      drawDiamond(marginX + (i / 8) * playWidth, tableTop + height - railCenterY);
     }
     for (let j = 0; j <= 4; j++) {
-      drawDiamond(marginX / 2, tableTop + marginY + (j / 4) * playHeight);
-      drawDiamond(width - marginX / 2, tableTop + marginY + (j / 4) * playHeight);
+      drawDiamond(railCenterX, tableTop + marginY + (j / 4) * playHeight);
+      drawDiamond(width - railCenterX, tableTop + marginY + (j / 4) * playHeight);
     }
   }
 
@@ -273,9 +331,11 @@ export function renderDiagramToCanvas({
   });
 
   // 6. Text annotations
+  const TEXT_SIZE_SCALES_HD = { xs: 0.55, s: 0.75, m: 1.0, l: 1.4, xl: 1.9 };
   (texts || []).forEach((t) => {
     const pt = normToPx(t.x, t.y);
-    const fontSize = Math.max(12 * scale, Math.round(playWidth * 0.015));
+    const sizeScale = TEXT_SIZE_SCALES_HD[t.size ?? 'm'] ?? 1.0;
+    const fontSize = Math.max(12 * scale, Math.round(playWidth * 0.015 * sizeScale));
     const col = t.color || '#f59e0b';
 
     ctx.save();
@@ -464,7 +524,7 @@ export function renderDiagramToCanvas({
 export async function generateHDDiagramBlob(diagramData, options = {}) {
   const {
     width = 1920,
-    height = 960,
+    height = 1066,
     format = 'image/png', // 'image/png', 'image/jpeg', 'image/webp'
     quality = 0.95,
   } = options;
@@ -476,6 +536,7 @@ export async function generateHDDiagramBlob(diagramData, options = {}) {
     height,
     clothColor: diagramData.table?.clothColor ?? '#0d5c3a',
     showDiamonds: diagramData.table?.showDiamonds ?? true,
+    showDetailedPoints: options.showDetailedPoints ?? diagramData.table?.showDetailedPoints ?? false,
     balls: diagramData.balls,
     lines: diagramData.lines,
     points: diagramData.points,
@@ -555,7 +616,7 @@ function adjustHexBrightness(hex, pct) {
 export function generateDiagramSVG(diagramData, options = {}) {
   const {
     width  = 1920,
-    height = 960,
+    height = 1066,
     showHeader    = false,
     titleText     = 'Billiard Sketcher — Diagrama 3 Bandas',
     subtitleText  = '',
@@ -566,6 +627,7 @@ export function generateDiagramSVG(diagramData, options = {}) {
 
   const clothColor  = diagramData.table?.clothColor  ?? '#0d5c3a';
   const showDiamonds = diagramData.table?.showDiamonds ?? true;
+  const showDetailedPoints = options.showDetailedPoints ?? diagramData.table?.showDetailedPoints ?? false;
   const balls       = diagramData.balls  ?? {};
   const lines       = diagramData.lines  ?? [];
   const points      = diagramData.points ?? [];
@@ -578,12 +640,18 @@ export function generateDiagramSVG(diagramData, options = {}) {
   const bannerHeight = showHeader ? Math.max(48, Math.round(width * 0.05)) : 0;
   const totalHeight  = height + bannerHeight;
 
-  const marginX    = width  * 0.045;
-  const marginY    = height * 0.09;
+  // Real 3-cushion table dimensions (2.84m x 1.42m playfield, 3.19m x 1.77m total exterior)
+  // Total border = 175mm (50mm rubber cushion + 125mm wooden frame)
+  const marginX    = width  * (175 / 3190);
+  const marginY    = height * (175 / 1770);
   const playWidth  = width  - marginX * 2;
   const playHeight = height - marginY * 2;
-  const scale      = playWidth / 819;
+  const scale      = playWidth / 801;
   const tableTop   = bannerHeight;
+  const cushionW   = marginX * (50 / 175);
+  const cushionH   = marginY * (50 / 175);
+  const railCenterX = marginX * (62.5 / 175);
+  const railCenterY = marginY * (62.5 / 175);
 
   const normToPx = (nx, ny) => ({
     x: marginX + nx * playWidth,
@@ -635,32 +703,63 @@ export function generateDiagramSVG(diagramData, options = {}) {
   body += `<rect x="0" y="${tableTop}" width="${width}" height="${Math.max(2, height * 0.008)}" fill="rgba(255,255,255,0.08)"/>`;
   body += `<rect x="0" y="${tableTop + height - Math.max(4, height * 0.012)}" width="${width}" height="${Math.max(4, height * 0.012)}" fill="rgba(0,0,0,0.4)"/>`;
 
-  // ── 3. Cloth ────────────────────────────────────────────────────
-  body += `<rect x="${marginX}" y="${tableTop + marginY}" width="${playWidth}" height="${playHeight}" fill="${esc(clothColor)}"/>`;
-  body += `<rect x="${marginX}" y="${tableTop + marginY}" width="${playWidth}" height="${playHeight}"
-    fill="none" stroke="#052b1b" stroke-width="${Math.max(2, playWidth * 0.005)}"/>`;
+  // ── 3. Rubber cushion band (wrapped in cloth, with depth shading) ──
+  body += `<rect x="${(marginX - cushionW).toFixed(1)}" y="${(tableTop + marginY - cushionH).toFixed(1)}" width="${(playWidth + cushionW * 2).toFixed(1)}" height="${(playHeight + cushionH * 2).toFixed(1)}" fill="${esc(clothColor)}"/>`;
+  body += `<rect x="${(marginX - cushionW).toFixed(1)}" y="${(tableTop + marginY - cushionH).toFixed(1)}" width="${(playWidth + cushionW * 2).toFixed(1)}" height="${(playHeight + cushionH * 2).toFixed(1)}" fill="rgba(0,0,0,0.22)"/>`;
 
-  // Cushion bevels
-  const bevelW = Math.max(4, playWidth * 0.005);
-  body += `<rect x="${marginX - bevelW}" y="${tableTop + marginY - bevelW}" width="${playWidth + bevelW * 2}" height="${bevelW}" fill="rgba(0,0,0,0.25)"/>`;
-  body += `<rect x="${marginX - bevelW}" y="${tableTop + marginY + playHeight}" width="${playWidth + bevelW * 2}" height="${bevelW}" fill="rgba(0,0,0,0.25)"/>`;
-  body += `<rect x="${marginX - bevelW}" y="${tableTop + marginY - bevelW}" width="${bevelW}" height="${playHeight + bevelW * 2}" fill="rgba(0,0,0,0.25)"/>`;
-  body += `<rect x="${marginX + playWidth}" y="${tableTop + marginY - bevelW}" width="${bevelW}" height="${playHeight + bevelW * 2}" fill="rgba(0,0,0,0.25)"/>`;
+  // Flat playing surface (pizarra / paño de juego)
+  body += `<rect x="${marginX.toFixed(1)}" y="${(tableTop + marginY).toFixed(1)}" width="${playWidth.toFixed(1)}" height="${playHeight.toFixed(1)}" fill="${esc(clothColor)}"/>`;
 
-  // ── 4. Diamonds ──────────────────────────────────────────────────
-  if (showDiamonds) {
+  // Cushion nose bevel (arista de rebote)
+  body += `<rect x="${marginX.toFixed(1)}" y="${(tableTop + marginY).toFixed(1)}" width="${playWidth.toFixed(1)}" height="${playHeight.toFixed(1)}" fill="none" stroke="rgba(0,0,0,0.50)" stroke-width="${Math.max(1.5, playWidth * 0.0025).toFixed(1)}"/>`;
+
+  // Corner mitres (corte a 45° en las esquinas de las bandas)
+  const mitreW = Math.max(1, playWidth * 0.0018).toFixed(1);
+  body += `<line x1="${(marginX - cushionW).toFixed(1)}" y1="${(tableTop + marginY - cushionH).toFixed(1)}" x2="${marginX.toFixed(1)}" y2="${(tableTop + marginY).toFixed(1)}" stroke="rgba(0,0,0,0.38)" stroke-width="${mitreW}"/>`;
+  body += `<line x1="${(marginX + playWidth + cushionW).toFixed(1)}" y1="${(tableTop + marginY - cushionH).toFixed(1)}" x2="${(marginX + playWidth).toFixed(1)}" y2="${(tableTop + marginY).toFixed(1)}" stroke="rgba(0,0,0,0.38)" stroke-width="${mitreW}"/>`;
+  body += `<line x1="${(marginX - cushionW).toFixed(1)}" y1="${(tableTop + marginY + playHeight + cushionH).toFixed(1)}" x2="${marginX.toFixed(1)}" y2="${(tableTop + marginY + playHeight).toFixed(1)}" stroke="rgba(0,0,0,0.38)" stroke-width="${mitreW}"/>`;
+  body += `<line x1="${(marginX + playWidth + cushionW).toFixed(1)}" y1="${(tableTop + marginY + playHeight + cushionH).toFixed(1)}" x2="${(marginX + playWidth).toFixed(1)}" y2="${(tableTop + marginY + playHeight).toFixed(1)}" stroke="rgba(0,0,0,0.38)" stroke-width="${mitreW}"/>`;
+
+  // ── 4. Diamonds & Detailed points (centered in 125mm wooden rail) ──
+  if (showDetailedPoints) {
+    const rMajor = Math.max(3.6 * scale, playWidth * 0.0038);
+    const rHalf  = Math.max(2.2 * scale, playWidth * 0.0023);
+    const rTenth = Math.max(1.3 * scale, playWidth * 0.0014);
+
+    const dotSvg = (cx, cy, r, lw) =>
+      `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="#f8fafc" stroke="#1e293b" stroke-width="${lw.toFixed(1)}"/>`;
+
+    for (let k = 0; k <= 80; k++) {
+      const x = marginX + (k / 80) * playWidth;
+      const isMajor = k % 10 === 0;
+      const isHalf  = k % 5 === 0;
+      const r  = isMajor ? rMajor : isHalf ? rHalf : rTenth;
+      const lw = isMajor ? Math.max(1, scale * 0.8) : isHalf ? Math.max(0.8, scale * 0.7) : Math.max(0.6, scale * 0.5);
+      body += dotSvg(x, tableTop + railCenterY, r, lw);
+      body += dotSvg(x, tableTop + height - railCenterY, r, lw);
+    }
+    for (let k = 0; k <= 40; k++) {
+      const y = tableTop + marginY + (k / 40) * playHeight;
+      const isMajor = k % 10 === 0;
+      const isHalf  = k % 5 === 0;
+      const r  = isMajor ? rMajor : isHalf ? rHalf : rTenth;
+      const lw = isMajor ? Math.max(1, scale * 0.8) : isHalf ? Math.max(0.8, scale * 0.7) : Math.max(0.6, scale * 0.5);
+      body += dotSvg(railCenterX, y, r, lw);
+      body += dotSvg(width - railCenterX, y, r, lw);
+    }
+  } else if (showDiamonds) {
     const dr = Math.max(3 * scale, playWidth * 0.004);
     const diamond = (cx, cy) =>
       `<polygon points="${cx},${cy - dr} ${cx + dr * 0.75},${cy} ${cx},${cy + dr} ${cx - dr * 0.75},${cy}"
         fill="#f8fafc" stroke="#1e293b" stroke-width="${Math.max(1, scale * 0.8)}"/>`;
 
     for (let i = 0; i <= 8; i++) {
-      body += diamond(marginX + (i / 8) * playWidth, tableTop + marginY / 2);
-      body += diamond(marginX + (i / 8) * playWidth, tableTop + height - marginY / 2);
+      body += diamond(marginX + (i / 8) * playWidth, tableTop + railCenterY);
+      body += diamond(marginX + (i / 8) * playWidth, tableTop + height - railCenterY);
     }
     for (let j = 0; j <= 4; j++) {
-      body += diamond(marginX / 2, tableTop + marginY + (j / 4) * playHeight);
-      body += diamond(width - marginX / 2, tableTop + marginY + (j / 4) * playHeight);
+      body += diamond(railCenterX, tableTop + marginY + (j / 4) * playHeight);
+      body += diamond(width - railCenterX, tableTop + marginY + (j / 4) * playHeight);
     }
   }
 
@@ -719,9 +818,11 @@ export function generateDiagramSVG(diagramData, options = {}) {
   });
 
   // ── 7. Texts ─────────────────────────────────────────────────────
+  const TEXT_SIZE_SCALES_SVG = { xs: 0.55, s: 0.75, m: 1.0, l: 1.4, xl: 1.9 };
   texts.forEach((t) => {
     const pt      = normToPx(t.x, t.y);
-    const fontSize = Math.max(12 * scale, Math.round(playWidth * 0.015));
+    const sizeScale = TEXT_SIZE_SCALES_SVG[t.size ?? 'm'] ?? 1.0;
+    const fontSize = Math.max(12 * scale, Math.round(playWidth * 0.015 * sizeScale));
     const col     = t.color || '#f59e0b';
     body += `<text x="${pt.x}" y="${pt.y}" dominant-baseline="middle" text-anchor="middle"
       font-family="Inter,system-ui,sans-serif" font-size="${fontSize}" font-weight="700"

@@ -7,23 +7,25 @@ import PointPanel from './components/PointPanel';
 import TextPanel from './components/TextPanel';
 import HDScreenshotModal from './components/HDScreenshotModal';
 import { exportMovieWebM } from './utils/movieExport';
-import { Palette, Layers, Info, Compass } from 'lucide-react';
+import { Palette, Layers, Info, Compass, MoreHorizontal } from 'lucide-react';
 
 export default function App() {
-  const [activeTool, setActiveTool]           = useState('move');
-  const [clothColor, setClothColor]           = useState('#0d5c3a');
-  const [showDiamonds, setShowDiamonds]       = useState(true);
+  const [activeTool, setActiveTool] = useState('move');
+  const [clothColor, setClothColor] = useState('#0d5c3a');
+  const [showDiamonds, setShowDiamonds] = useState(true);
+  const [showDetailedPoints, setShowDetailedPoints] = useState(false);
   const [showAlignmentGuides, setShowAlignmentGuides] = useState(true);
 
   /* Points state */
-  const [points, setPoints]                 = useState([]);
-  const [pointRadius, setPointRadius]       = useState(8);
-  const [pointColor, setPointColor]         = useState('#ef4444');
+  const [points, setPoints] = useState([]);
+  const [pointRadius, setPointRadius] = useState(8);
+  const [pointColor, setPointColor] = useState('#ef4444');
   const [selectedPointId, setSelectedPointId] = useState(null);
 
   /* Texts state */
-  const [texts, setTexts]                   = useState([]);
-  const [textColor, setTextColor]           = useState('#f59e0b');
+  const [texts, setTexts] = useState([]);
+  const [textColor, setTextColor] = useState('#f59e0b');
+  const [textSize, setTextSize]   = useState('m');
   const [selectedTextId, setSelectedTextId] = useState(null);
 
   /* HD Screenshot Modal State */
@@ -38,12 +40,12 @@ export default function App() {
 
   /* Line state bridge: TableCanvas → App → Toolbar */
   const [lineState, setLineState] = useState({
-    isDrawingLine:    false,
-    selectedLineId:   null,
-    finishLine:       null,
+    isDrawingLine: false,
+    selectedLineId: null,
+    finishLine: null,
     dropSelectedLine: null,
     updateSelectedLine: null,
-    selectedLine:     null,
+    selectedLine: null,
   });
 
   const exportHandlerRef = useRef(null);
@@ -92,21 +94,29 @@ export default function App() {
     input.click();
   };
 
-  const handleResetTable  = () => {
+  const handleResetTable = () => {
     if (window.confirm('¿Reiniciar mesa y limpiar todos los dibujos?')) window.location.reload();
+  };
+
+  const handleToggleDetailedPoints = () => {
+    setShowDetailedPoints((prev) => {
+      const next = !prev;
+      if (next && !showDiamonds) setShowDiamonds(true);
+      return next;
+    });
   };
 
   /* ── Movie / animation state ── */
   const captureHandlerRef = useRef(null);
   const handleRegisterCaptureHandler = (getter) => { captureHandlerRef.current = getter; };
 
-  const [movieMode, setMovieMode]       = useState(false);
+  const [movieMode, setMovieMode] = useState(false);
   const [frameSeconds, setFrameSeconds] = useState('1');
-  const [frames, setFrames]             = useState([]); // { id, dataUrl, width, height, seconds }
+  const [frames, setFrames] = useState([]); // { id, dataUrl, width, height, seconds }
 
   /* Movie text & watermark settings */
-  const [movieTitleText, setMovieTitleText]         = useState('Billiard Sketcher — Animación 3 Bandas');
-  const [movieShowHeader, setMovieShowHeader]       = useState(true);
+  const [movieTitleText, setMovieTitleText] = useState('Billiard Sketcher — Animación 3 Bandas');
+  const [movieShowHeader, setMovieShowHeader] = useState(true);
   const [movieShowWatermark, setMovieShowWatermark] = useState(true);
   const [movieWatermarkText, setMovieWatermarkText] = useState('Billiard Sketcher • 3-Bandas HD');
 
@@ -150,14 +160,14 @@ export default function App() {
 
   /* ── Strike & Spin (Toma y Efecto) state ── */
   const [strikeMode, setStrikeMode] = useState(true);
-  const [spin, setSpin]             = useState({ x: 0, y: 0 }); // english / efecto, -1..1
-  const [strike, setStrike]         = useState(-0.5);          // yellow A offset: -1 left .. 0 center .. +1 right
+  const [spin, setSpin] = useState({ x: 0, y: 0 }); // english / efecto, -1..1
+  const [strike, setStrike] = useState(-0.5);          // yellow A offset: -1 left .. 0 center .. +1 right
 
   const clothOptions = [
-    { name: 'Verde',  hex: '#0d5c3a' },
-    { name: 'Azul',   hex: '#1e3a8a' },
-    { name: 'Gris',   hex: '#334155' },
-    { name: 'Negro',  hex: '#111827' },
+    { name: 'Verde', hex: '#0d5c3a' },
+    { name: 'Azul', hex: '#1e3a8a' },
+    { name: 'Gris', hex: '#334155' },
+    { name: 'Negro', hex: '#111827' },
   ];
 
   return (
@@ -193,15 +203,15 @@ export default function App() {
         {/* Logo + Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img
-              src="/logo.svg"
-              alt="Billiard Sketcher"
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                flexShrink: 0,
-              }}
-            />
+            src="/logo.svg"
+            alt="Billiard Sketcher"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              flexShrink: 0,
+            }}
+          />
           <div>
             <h1
               style={{
@@ -217,7 +227,7 @@ export default function App() {
               Billiard Sketcher
             </h1>
             <p style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1 }}>
-              Maestro del Billar — Diseñador 3 Bandas
+              3-Cushion Billiard Sketcher
             </p>
           </div>
         </div>
@@ -253,7 +263,7 @@ export default function App() {
         selectedLineId={lineState.selectedLineId}
         onDropSelectedLine={lineState.dropSelectedLine}
         selectedLine={lineState.selectedLine}
-        onUpdateLine={lineState.updateSelectedLine ?? (() => {})}
+        onUpdateLine={lineState.updateSelectedLine ?? (() => { })}
         movieMode={movieMode}
         onToggleMovieMode={() => setMovieMode(m => !m)}
         frameSeconds={frameSeconds}
@@ -262,6 +272,8 @@ export default function App() {
         frameCount={frames.length}
         strikeMode={strikeMode}
         onToggleStrikeMode={() => setStrikeMode(m => !m)}
+        showDetailedPoints={showDetailedPoints}
+        onToggleDetailedPoints={handleToggleDetailedPoints}
         onOpenHDModal={() => setIsHDModalOpen(true)}
       />
 
@@ -295,6 +307,8 @@ export default function App() {
             setClothColor={setClothColor}
             showDiamonds={showDiamonds}
             setShowDiamonds={setShowDiamonds}
+            showDetailedPoints={showDetailedPoints}
+            setShowDetailedPoints={setShowDetailedPoints}
             showAlignmentGuides={showAlignmentGuides}
             setShowAlignmentGuides={setShowAlignmentGuides}
             strikeMode={strikeMode}
@@ -313,6 +327,8 @@ export default function App() {
             setTexts={setTexts}
             textColor={textColor}
             setTextColor={setTextColor}
+            textSize={textSize}
+            setTextSize={setTextSize}
             selectedTextId={selectedTextId}
             setSelectedTextId={setSelectedTextId}
             onRegisterExportHandler={handleRegisterExportHandler}
@@ -403,7 +419,38 @@ export default function App() {
                 id="diamond-toggle"
                 type="checkbox"
                 checked={showDiamonds}
-                onChange={(e) => setShowDiamonds(e.target.checked)}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setShowDiamonds(val);
+                  if (!val) setShowDetailedPoints(false);
+                }}
+                style={{ width: 15, height: 15, accentColor: 'var(--sky)', cursor: 'pointer' }}
+              />
+            </div>
+
+            {/* Detailed Points toggle */}
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                paddingTop: 8, borderTop: '1px solid var(--border)',
+              }}
+            >
+              <label
+                htmlFor="detailed-points-toggle"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}
+              >
+                <MoreHorizontal size={13} color="var(--sky-light)" />
+                Puntos detallados (1/10)
+              </label>
+              <input
+                id="detailed-points-toggle"
+                type="checkbox"
+                checked={showDetailedPoints}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setShowDetailedPoints(val);
+                  if (val && !showDiamonds) setShowDiamonds(true);
+                }}
                 style={{ width: 15, height: 15, accentColor: 'var(--sky)', cursor: 'pointer' }}
               />
             </div>
@@ -450,6 +497,8 @@ export default function App() {
           <TextPanel
             textColor={textColor}
             setTextColor={setTextColor}
+            textSize={textSize}
+            setTextSize={setTextSize}
             texts={texts}
             setTexts={setTexts}
             selectedTextId={selectedTextId}

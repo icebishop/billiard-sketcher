@@ -5,10 +5,10 @@ import {
 import { renderDiagramToCanvas, downloadHDDiagram, copyHDDiagramToClipboard, downloadSVGDiagram } from '../utils/hdRender';
 
 const RESOLUTION_PRESETS = [
-  { id: '1080p', name: 'Full HD 1080p', width: 1920, height: 960, badge: 'Recomendado', megapixels: '1.8 MP' },
-  { id: '2K',    name: '2K QHD',        width: 2560, height: 1280, badge: 'Alta Def.',  megapixels: '3.3 MP' },
-  { id: '4K',    name: '4K Ultra HD',   width: 3840, height: 1920, badge: 'Ultra Def.', megapixels: '7.4 MP' },
-  { id: '8K',    name: '8K Ultra HD',   width: 7680, height: 3840, badge: 'Máxima',     megapixels: '29.5 MP' },
+  { id: '1080p', name: 'Full HD (Escala Real)', width: 1920, height: 1066, badge: 'Recomendado', megapixels: '2.0 MP' },
+  { id: '2K',    name: '2K QHD (Escala Real)',   width: 2560, height: 1420, badge: 'Alta Def.',  megapixels: '3.6 MP' },
+  { id: '4K',    name: '4K Ultra HD (Escala Real)', width: 3840, height: 2132, badge: 'Ultra Def.', megapixels: '8.2 MP' },
+  { id: '8K',    name: '8K Ultra HD (Escala Real)', width: 7680, height: 4264, badge: 'Máxima',     megapixels: '32.7 MP' },
 ];
 
 const FORMAT_OPTIONS = [
@@ -46,7 +46,7 @@ export default function HDScreenshotModal({
   // Calculate target resolution
   const preset = RESOLUTION_PRESETS.find(p => p.id === selectedPreset) || RESOLUTION_PRESETS[0];
   const targetWidth = isCustomMode ? Math.round(900 * customScale) : preset.width;
-  const targetHeight = isCustomMode ? Math.round(450 * customScale) : preset.height;
+  const targetHeight = isCustomMode ? Math.round(targetWidth * (1770 / 3190)) : preset.height;
   const mpVal = ((targetWidth * targetHeight) / 1000000).toFixed(1);
 
   // Render live preview on thumbnail canvas whenever settings change
@@ -55,15 +55,16 @@ export default function HDScreenshotModal({
     const diagramData = getDiagramData();
     if (!diagramData) return;
 
-    // Render offscreen at 640px width for fast live preview UI response
+    // Render offscreen at 640px width for fast live preview UI response (ratio 3190/1770)
     const previewW = 640;
-    const previewH = 320;
+    const previewH = Math.round(640 * (1770 / 3190)); // 355px
     renderDiagramToCanvas({
       canvas: previewCanvasRef.current,
       width: previewW,
       height: previewH,
       clothColor: diagramData.table?.clothColor ?? '#0d5c3a',
       showDiamonds: diagramData.table?.showDiamonds ?? true,
+      showDetailedPoints: diagramData.table?.showDetailedPoints ?? false,
       balls: diagramData.balls,
       lines: diagramData.lines,
       points: diagramData.points,
