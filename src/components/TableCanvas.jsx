@@ -50,6 +50,8 @@ export default function TableCanvas({
   setShowDiamonds = () => {},
   showDetailedPoints = false,
   setShowDetailedPoints = () => {},
+  showReferenceSpots = false,
+  setShowReferenceSpots = () => {},
   showAlignmentGuides = true,
   setShowAlignmentGuides = () => {},
   strikeMode = false,
@@ -82,20 +84,26 @@ export default function TableCanvas({
   const [activeGuides, setActiveGuides] = useState([]);
 
   // ── Table Objects ────────────────────────────────────────────
+  // Official UMB initial break positions (284 cm × 142 cm table):
+  // - White (cue): head string (0.25), side spot 18.5 cm from head spot
+  // - Yellow (opponent): head spot (0.25, 0.5)
+  // - Red: foot spot (0.75, 0.5)
   const [balls, setBalls] = useState({
-    white: { x: 0.25, y: 0.75, label: '1' },
-    yellow: { x: 0.25, y: 0.25, label: '2' },
-    red: { x: 0.75, y: 0.5, label: '3' },
+    white:  { x: 0.25, y: 0.5 + 18.5 / 142, label: '1' },
+    yellow: { x: 0.25, y: 0.5,              label: '2' },
+    red:    { x: 0.75, y: 0.5,              label: '3' },
   });
 
   const [lines, setLines] = useState([
     {
       id: 'default-line-1',
       points: [
-        { x: 0.25, y: 0.75 },
-        { x: 0.5, y: 0.05 },
-        { x: 0.95, y: 0.4 },
-        { x: 0.75, y: 0.5 },
+        { x: 0.25,  y: 0.5 + 18.5 / 142 },
+        { x: 0.75,  y: 0.5 },
+        { x: 0.945, y: 0 },
+        { x: 1,     y: 0.125 },
+        { x: 0.5,   y: 1 },
+        { x: 0.25,  y: 0.5 },
       ],
       color: '#06b6d4',
       style: 'solid',
@@ -126,8 +134,8 @@ export default function TableCanvas({
     if (!container) return;
 
     const compute = () => {
-      const availW = container.clientWidth  - 32; // inner padding
-      const availH = container.clientHeight - 48; // room for hint bar
+      const availW = container.clientWidth  - 56; // horizontal padding (48px) + border/clearance
+      const availH = container.clientHeight - 58; // vertical padding (28px) + gap + hint bar
       if (availW <= 0 || availH <= 0) return;
       // Real 3-cushion table aspect ratio (3.19m x 1.77m total outer dimensions)
       const TABLE_RATIO = 3190 / 1770; // ~1.80226
@@ -137,8 +145,10 @@ export default function TableCanvas({
         h = availH;
         w = h * TABLE_RATIO;
       }
-      w = Math.max(w, 320);
-      h = w / TABLE_RATIO;
+      if (w < 240) {
+        w = 240;
+        h = w / TABLE_RATIO;
+      }
       setDimensions({ width: Math.round(w), height: Math.round(h) });
     };
 
@@ -192,7 +202,7 @@ export default function TableCanvas({
 
     const targets = [];
 
-    // 1. Diamond alignment targets
+    // 1. Diamond alignment targets (full-table guides)
     if (showDetailedPoints) {
       for (let i = 0; i <= 16; i++) {
         targets.push({ id: `d-top-${i}`, x: i / 16, y: 0 });
@@ -201,6 +211,32 @@ export default function TableCanvas({
       for (let j = 0; j <= 8; j++) {
         targets.push({ id: `d-left-${j}`, x: 0, y: j / 8 });
         targets.push({ id: `d-right-${j}`, x: 1, y: j / 8 });
+      }
+
+      // 1b. Detailed 1/10 point magnet targets along rails/cushions
+      const topLeftPx = normToPx(0, 0);
+      const botRightPx = normToPx(1, 1);
+      const RAIL_ZONE_PX = 48;
+
+      if (Math.abs(currPx.y - topLeftPx.y) <= RAIL_ZONE_PX) {
+        for (let k = 0; k <= 80; k++) {
+          targets.push({ id: `d10-top-${k}`, x: k / 80, y: 0 });
+        }
+      }
+      if (Math.abs(currPx.y - botRightPx.y) <= RAIL_ZONE_PX) {
+        for (let k = 0; k <= 80; k++) {
+          targets.push({ id: `d10-bot-${k}`, x: k / 80, y: 1 });
+        }
+      }
+      if (Math.abs(currPx.x - topLeftPx.x) <= RAIL_ZONE_PX) {
+        for (let k = 0; k <= 40; k++) {
+          targets.push({ id: `d10-left-${k}`, x: 0, y: k / 40 });
+        }
+      }
+      if (Math.abs(currPx.x - botRightPx.x) <= RAIL_ZONE_PX) {
+        for (let k = 0; k <= 40; k++) {
+          targets.push({ id: `d10-right-${k}`, x: 1, y: k / 40 });
+        }
       }
     } else {
       for (let i = 0; i <= 8; i++) {
@@ -226,6 +262,17 @@ export default function TableCanvas({
         targets.push({ id: t.id, x: t.x, y: t.y });
       }
     });
+
+    // 4. Official UMB Reference Spots on the cloth (when enabled)
+    if (showReferenceSpots) {
+      targets.push(
+        { id: 'ref-head', x: 0.25, y: 0.5 },
+        { id: 'ref-head-top', x: 0.25, y: 0.5 - 18.5 / 142 },
+        { id: 'ref-head-bot', x: 0.25, y: 0.5 + 18.5 / 142 },
+        { id: 'ref-center', x: 0.5, y: 0.5 },
+        { id: 'ref-foot', x: 0.75, y: 0.5 }
+      );
+    }
 
     // Note: Balls are deliberately excluded so magnet snapping ONLY applies between points, text & diamond marks.
 
@@ -269,7 +316,7 @@ export default function TableCanvas({
     }
 
     return { snappedNx, snappedNy, guides };
-  }, [showAlignmentGuides, showDetailedPoints, points, texts, normToPx]);
+  }, [showAlignmentGuides, showDetailedPoints, showReferenceSpots, points, texts, normToPx]);
 
   // ── Line Actions ─────────────────────────────────────────────
   const finishCurrentLine = useCallback(() => {
@@ -440,6 +487,27 @@ export default function TableCanvas({
       }
     }
 
+    // 3.5 Official UMB Reference Spots on the cloth
+    if (showReferenceSpots) {
+      const refSpots = [
+        { x: 0.25, y: 0.5 },                // Head spot (71 cm)
+        { x: 0.25, y: 0.5 - 18.5 / 142 },   // Side break spot (-18.5 cm)
+        { x: 0.25, y: 0.5 + 18.5 / 142 },   // Side break spot (+18.5 cm)
+        { x: 0.5,  y: 0.5 },                // Center spot
+        { x: 0.75, y: 0.5 },                // Foot spot (71 cm)
+      ];
+      const dotR = Math.max(2.5, playWidth * 0.003);
+      ctx.save();
+      ctx.fillStyle = '#090d16';
+      refSpots.forEach((s) => {
+        const pt = normToPx(s.x, s.y);
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, dotR, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
     // 4. Draw polygonal lines
     // Include both finalized lines and any active line currently in progress (with >= 2 points) during capture
     const linesToDraw = [...lines];
@@ -571,6 +639,17 @@ export default function TableCanvas({
         ctx.fillStyle = activeTool === 'arrow' ? '#f59e0b' : '#06b6d4';
         ctx.fill();
       });
+    } else if ((activeTool === 'line' || activeTool === 'arrow') && mousePreviewPoint && !captureModeRef.current) {
+      const pt = normToPx(mousePreviewPoint.x, mousePreviewPoint.y);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = activeTool === 'arrow' ? 'rgba(245, 158, 11, 0.45)' : 'rgba(6, 182, 212, 0.45)';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = activeTool === 'arrow' ? '#f59e0b' : '#06b6d4';
+      ctx.stroke();
+      ctx.restore();
     }
 
     // 5.5 Points placed over table (including cloth & wooden bands/rails)
@@ -891,7 +970,7 @@ export default function TableCanvas({
       ctx.setLineDash([]);
       ctx.restore();
     }
-  }, [dimensions, clothColor, showDiamonds, showDetailedPoints, showAlignmentGuides, activeGuides, balls, lines, texts, points, pointRadius, pointColor, selectedPointId, selectedTextId,
+  }, [dimensions, clothColor, showDiamonds, showDetailedPoints, showReferenceSpots, showAlignmentGuides, activeGuides, balls, lines, texts, points, pointRadius, pointColor, selectedPointId, selectedTextId,
     currentLinePoints, mousePreviewPoint,
     selectedLineId, activeTool, normToPx, draggingVertex,
     strikeMode, spin, strike]);
@@ -1027,10 +1106,11 @@ export default function TableCanvas({
 
     // ── Line / Arrow drawing ──
     if (activeTool === 'line' || activeTool === 'arrow') {
+      const { snappedNx, snappedNy } = getSnapGuides(nx, ny, null);
       if (!currentLinePoints) {
-        setCurrentLinePoints([{ x: nx, y: ny }]);
+        setCurrentLinePoints([{ x: snappedNx, y: snappedNy }]);
       } else {
-        setCurrentLinePoints(prev => [...prev, { x: nx, y: ny }]);
+        setCurrentLinePoints(prev => [...prev, { x: snappedNx, y: snappedNy }]);
       }
       return;
     }
@@ -1092,14 +1172,16 @@ export default function TableCanvas({
     const { nx, ny } = pxToNorm(px, py);
 
     if (draggingVertex) {
+      const { snappedNx, snappedNy, guides } = getSnapGuides(nx, ny, null);
       setLines(prev =>
         prev.map(l => {
           if (l.id !== draggingVertex.lineId) return l;
           const pts = [...l.points];
-          pts[draggingVertex.pointIndex] = { x: nx, y: ny };
+          pts[draggingVertex.pointIndex] = { x: snappedNx, y: snappedNy };
           return { ...l, points: pts };
         })
       );
+      setActiveGuides(guides);
       return;
     }
 
@@ -1123,10 +1205,12 @@ export default function TableCanvas({
       return;
     }
 
-    if (currentLinePoints || activeTool === 'point' || activeTool === 'text') {
+    if (currentLinePoints || activeTool === 'line' || activeTool === 'arrow' || activeTool === 'point' || activeTool === 'text') {
       const { snappedNx, snappedNy, guides } = getSnapGuides(nx, ny, null);
       setMousePreviewPoint({ x: snappedNx, y: snappedNy });
       setActiveGuides(guides);
+    } else {
+      setActiveGuides(prev => (prev.length > 0 ? [] : prev));
     }
   }, [draggingVertex, draggingPoint, draggingBall, draggingText, currentLinePoints, activeTool, pxToNorm, getSnapGuides, setPoints, setTexts]);
 
@@ -1187,6 +1271,7 @@ export default function TableCanvas({
       clothColor,
       showDiamonds,
       showDetailedPoints,
+      showReferenceSpots,
       balls,
       lines: activeLines,
       points,
@@ -1206,7 +1291,7 @@ export default function TableCanvas({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, showDetailedPoints, balls, points, texts, strikeMode, spin, strike]);
+  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, showDetailedPoints, showReferenceSpots, balls, points, texts, strikeMode, spin, strike]);
 
   useEffect(() => {
     if (onRegisterExportHandler) onRegisterExportHandler(() => exportPNG);
@@ -1241,6 +1326,7 @@ export default function TableCanvas({
       clothColor,
       showDiamonds,
       showDetailedPoints,
+      showReferenceSpots,
       balls,
       lines: activeLines,
       points,
@@ -1261,7 +1347,7 @@ export default function TableCanvas({
       width: 1920,
       height: 1066,
     };
-  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, showDetailedPoints, balls, points, texts, strikeMode, spin, strike]);
+  }, [lines, currentLinePoints, finishCurrentLine, activeTool, clothColor, showDiamonds, showDetailedPoints, showReferenceSpots, balls, points, texts, strikeMode, spin, strike]);
 
   useEffect(() => {
     if (onRegisterCaptureHandler) onRegisterCaptureHandler(() => captureFrame);
@@ -1277,6 +1363,7 @@ export default function TableCanvas({
         clothColor,
         showDiamonds,
         showDetailedPoints,
+        showReferenceSpots,
         showAlignmentGuides,
       },
       balls,
@@ -1289,7 +1376,7 @@ export default function TableCanvas({
         strikeMode,
       },
     };
-  }, [clothColor, showDiamonds, showDetailedPoints, showAlignmentGuides, balls, lines, points, texts, spin, strike, strikeMode]);
+  }, [clothColor, showDiamonds, showDetailedPoints, showReferenceSpots, showAlignmentGuides, balls, lines, points, texts, spin, strike, strikeMode]);
 
   const loadDiagramData = useCallback((data) => {
     if (!data) return;
@@ -1300,11 +1387,12 @@ export default function TableCanvas({
     if (data.table?.clothColor) setClothColor(data.table.clothColor);
     if (data.table?.showDiamonds !== undefined) setShowDiamonds(data.table.showDiamonds);
     if (data.table?.showDetailedPoints !== undefined) setShowDetailedPoints(data.table.showDetailedPoints);
+    if (data.table?.showReferenceSpots !== undefined) setShowReferenceSpots(data.table.showReferenceSpots);
     if (data.table?.showAlignmentGuides !== undefined) setShowAlignmentGuides(data.table.showAlignmentGuides);
     if (data.strike?.spin) setSpin(data.strike.spin);
     if (data.strike?.strike !== undefined) setStrike(data.strike.strike);
     if (data.strike?.strikeMode !== undefined) setStrikeMode(data.strike.strikeMode);
-  }, [setPoints, setTexts, setClothColor, setShowDiamonds, setShowDetailedPoints, setShowAlignmentGuides, setSpin, setStrike, setStrikeMode]);
+  }, [setPoints, setTexts, setClothColor, setShowDiamonds, setShowDetailedPoints, setShowReferenceSpots, setShowAlignmentGuides, setSpin, setStrike, setStrikeMode]);
 
   useEffect(() => {
     if (onRegisterJsonHandler) {
@@ -1338,11 +1426,12 @@ export default function TableCanvas({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         width: '100%',
         height: '100%',
-        padding: '12px',
+        padding: '12px 24px 16px',
         gap: 8,
+        minWidth: 0,
         minHeight: 0,
       }}
     >

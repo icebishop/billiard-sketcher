@@ -6,14 +6,16 @@ import StrikePanel from './components/StrikePanel';
 import PointPanel from './components/PointPanel';
 import TextPanel from './components/TextPanel';
 import HDScreenshotModal from './components/HDScreenshotModal';
+import HelpModal from './components/HelpModal';
 import { exportMovieWebM } from './utils/movieExport';
-import { Palette, Layers, Info, Compass, MoreHorizontal } from 'lucide-react';
+import { Palette, Layers, Compass, MoreHorizontal, Target } from 'lucide-react';
 
 export default function App() {
   const [activeTool, setActiveTool] = useState('move');
   const [clothColor, setClothColor] = useState('#0d5c3a');
   const [showDiamonds, setShowDiamonds] = useState(true);
   const [showDetailedPoints, setShowDetailedPoints] = useState(false);
+  const [showReferenceSpots, setShowReferenceSpots] = useState(false);
   const [showAlignmentGuides, setShowAlignmentGuides] = useState(true);
 
   /* Points state */
@@ -25,11 +27,12 @@ export default function App() {
   /* Texts state */
   const [texts, setTexts] = useState([]);
   const [textColor, setTextColor] = useState('#f59e0b');
-  const [textSize, setTextSize]   = useState('m');
+  const [textSize, setTextSize] = useState('m');
   const [selectedTextId, setSelectedTextId] = useState(null);
 
-  /* HD Screenshot Modal State */
+  /* HD Screenshot & Help Modal States */
   const [isHDModalOpen, setIsHDModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   /* Tool switch handler — deselect active selections to avoid crosstalk */
   const handleSelectTool = (tool) => {
@@ -173,7 +176,8 @@ export default function App() {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        height: '100dvh',
+        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--bg)',
@@ -274,7 +278,10 @@ export default function App() {
         onToggleStrikeMode={() => setStrikeMode(m => !m)}
         showDetailedPoints={showDetailedPoints}
         onToggleDetailedPoints={handleToggleDetailedPoints}
+        showReferenceSpots={showReferenceSpots}
+        onToggleReferenceSpots={() => setShowReferenceSpots(v => !v)}
         onOpenHDModal={() => setIsHDModalOpen(true)}
+        onOpenHelpModal={() => setIsHelpModalOpen(true)}
       />
 
       {/* ══════════════════════════════════════════════
@@ -309,6 +316,8 @@ export default function App() {
             setShowDiamonds={setShowDiamonds}
             showDetailedPoints={showDetailedPoints}
             setShowDetailedPoints={setShowDetailedPoints}
+            showReferenceSpots={showReferenceSpots}
+            setShowReferenceSpots={setShowReferenceSpots}
             showAlignmentGuides={showAlignmentGuides}
             setShowAlignmentGuides={setShowAlignmentGuides}
             strikeMode={strikeMode}
@@ -455,6 +464,29 @@ export default function App() {
               />
             </div>
 
+            {/* Reference Spots toggle */}
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                paddingTop: 8, borderTop: '1px solid var(--border)',
+              }}
+            >
+              <label
+                htmlFor="reference-spots-toggle"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}
+              >
+                <Target size={13} color="var(--sky-light)" />
+                Puntos de referencia
+              </label>
+              <input
+                id="reference-spots-toggle"
+                type="checkbox"
+                checked={showReferenceSpots}
+                onChange={(e) => setShowReferenceSpots(e.target.checked)}
+                style={{ width: 15, height: 15, accentColor: 'var(--sky)', cursor: 'pointer' }}
+              />
+            </div>
+
             {/* Alignment guides toggle */}
             <div
               style={{
@@ -524,43 +556,6 @@ export default function App() {
             movieWatermarkText={movieWatermarkText}
             onMovieWatermarkTextChange={setMovieWatermarkText}
           />
-
-          {/* ── 4. Quick Guide ── */}
-          <div
-            className="glass-panel"
-            style={{
-              margin: '0 10px',
-              padding: '12px 14px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-              background: 'rgba(10,16,30,0.5)',
-            }}
-          >
-            <h4
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 11.5, fontWeight: 600, color: 'var(--text)',
-              }}
-            >
-              <Info size={13} color="var(--sky-light)" />
-              Guía Rápida
-            </h4>
-            <ol style={{ paddingLeft: 14, display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {[
-                ['Mover', 'arrastra bolas, puntos o selecciona líneas'],
-                ['Punto', 'clic en cualquier lugar de la mesa (incluidas bandas)'],
-                ['Línea / Flecha', 'clic = vértice, doble clic = finalizar'],
-                ['Vértices azules', 'arrastra para mover puntos individuales'],
-                ['Supr', 'elimina la línea o punto seleccionado'],
-                ['Exportar PNG', 'guarda tu diagrama de jugada'],
-              ].map(([bold, rest], i) => (
-                <li key={i} style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                  <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{bold}</strong> — {rest}
-                </li>
-              ))}
-            </ol>
-          </div>
         </aside>
       </main>
 
@@ -580,7 +575,7 @@ export default function App() {
           flexShrink: 0,
         }}
       >
-        <span>Billiard Sketcher — Maestro del Billar · Diseñador de Jugadas de Tres Bandas</span>
+        <span>Billiard Sketcher</span>
         <span
           style={{
             fontSize: 10,
@@ -597,6 +592,12 @@ export default function App() {
         isOpen={isHDModalOpen}
         onClose={() => setIsHDModalOpen(false)}
         getDiagramData={() => jsonHandlerRef.current?.()?.getDiagramData()}
+      />
+
+      {/* Quick Guide Help Modal */}
+      <HelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
       />
     </div>
   );

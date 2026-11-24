@@ -61,10 +61,11 @@ export function renderDiagramToCanvas({
   clothColor = '#0d5c3a',
   showDiamonds = true,
   showDetailedPoints = false,
+  showReferenceSpots = false,
   balls = {
-    white: { x: 0.25, y: 0.75, label: '1' },
-    yellow: { x: 0.25, y: 0.25, label: '2' },
-    red: { x: 0.75, y: 0.5, label: '3' },
+    white:  { x: 0.25, y: 0.5 + 18.5 / 142, label: '1' },
+    yellow: { x: 0.25, y: 0.5,              label: '2' },
+    red:    { x: 0.75, y: 0.5,              label: '3' },
   },
   lines = [],
   points = [],
@@ -255,6 +256,27 @@ export function renderDiagramToCanvas({
       drawDiamond(railCenterX, tableTop + marginY + (j / 4) * playHeight);
       drawDiamond(width - railCenterX, tableTop + marginY + (j / 4) * playHeight);
     }
+  }
+
+  // 3.5 Official UMB Reference Spots on the cloth
+  if (showReferenceSpots) {
+    const refSpots = [
+      { x: 0.25, y: 0.5 },
+      { x: 0.25, y: 0.5 - 18.5 / 142 },
+      { x: 0.25, y: 0.5 + 18.5 / 142 },
+      { x: 0.5,  y: 0.5 },
+      { x: 0.75, y: 0.5 },
+    ];
+    const dotR = Math.max(2.5 * scale, playWidth * 0.003);
+    ctx.save();
+    ctx.fillStyle = '#090d16';
+    refSpots.forEach((s) => {
+      const pt = normToPx(s.x, s.y);
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, dotR, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
   }
 
   // 4. Polygonal lines & arrows
@@ -537,6 +559,7 @@ export async function generateHDDiagramBlob(diagramData, options = {}) {
     clothColor: diagramData.table?.clothColor ?? '#0d5c3a',
     showDiamonds: diagramData.table?.showDiamonds ?? true,
     showDetailedPoints: options.showDetailedPoints ?? diagramData.table?.showDetailedPoints ?? false,
+    showReferenceSpots: options.showReferenceSpots ?? diagramData.table?.showReferenceSpots ?? false,
     balls: diagramData.balls,
     lines: diagramData.lines,
     points: diagramData.points,
@@ -628,6 +651,7 @@ export function generateDiagramSVG(diagramData, options = {}) {
   const clothColor  = diagramData.table?.clothColor  ?? '#0d5c3a';
   const showDiamonds = diagramData.table?.showDiamonds ?? true;
   const showDetailedPoints = options.showDetailedPoints ?? diagramData.table?.showDetailedPoints ?? false;
+  const showReferenceSpots = options.showReferenceSpots ?? diagramData.table?.showReferenceSpots ?? false;
   const balls       = diagramData.balls  ?? {};
   const lines       = diagramData.lines  ?? [];
   const points      = diagramData.points ?? [];
@@ -761,6 +785,22 @@ export function generateDiagramSVG(diagramData, options = {}) {
       body += diamond(railCenterX, tableTop + marginY + (j / 4) * playHeight);
       body += diamond(width - railCenterX, tableTop + marginY + (j / 4) * playHeight);
     }
+  }
+
+  // ── 4.5 Official UMB Reference Spots on the cloth ───────────────
+  if (showReferenceSpots) {
+    const refSpots = [
+      { x: 0.25, y: 0.5 },
+      { x: 0.25, y: 0.5 - 18.5 / 142 },
+      { x: 0.25, y: 0.5 + 18.5 / 142 },
+      { x: 0.5,  y: 0.5 },
+      { x: 0.75, y: 0.5 },
+    ];
+    const dotR = Math.max(2.5 * scale, playWidth * 0.003).toFixed(1);
+    refSpots.forEach((s) => {
+      const pt = normToPx(s.x, s.y);
+      body += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${dotR}" fill="#090d16"/>`;
+    });
   }
 
   // ── 5. Lines & arrows ────────────────────────────────────────────

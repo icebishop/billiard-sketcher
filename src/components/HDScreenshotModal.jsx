@@ -65,6 +65,7 @@ export default function HDScreenshotModal({
       clothColor: diagramData.table?.clothColor ?? '#0d5c3a',
       showDiamonds: diagramData.table?.showDiamonds ?? true,
       showDetailedPoints: diagramData.table?.showDetailedPoints ?? false,
+      showReferenceSpots: diagramData.table?.showReferenceSpots ?? false,
       balls: diagramData.balls,
       lines: diagramData.lines,
       points: diagramData.points,

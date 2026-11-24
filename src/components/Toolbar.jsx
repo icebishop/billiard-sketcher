@@ -3,7 +3,7 @@ import {
   Move, PenTool, ArrowUpRight, CircleDot, Type, Eraser,
   Download, RotateCcw, CheckCircle, Trash2,
   Film, Camera, Clock, Crosshair, Save, FolderOpen,
-  MoreHorizontal,
+  MoreHorizontal, HelpCircle, Target,
 } from 'lucide-react';
 
 /* ── Preset color palette ── */
@@ -62,7 +62,10 @@ export default function Toolbar({
   onToggleStrikeMode,
   showDetailedPoints,
   onToggleDetailedPoints,
+  showReferenceSpots,
+  onToggleReferenceSpots,
   onOpenHDModal,
+  onOpenHelpModal,
 }) {
   const tools = [
     { id: 'move',   label: 'Mover',  icon: Move,         shortcut: 'V' },
@@ -256,6 +259,17 @@ export default function Toolbar({
           <MoreHorizontal size={15} strokeWidth={2.4} />
           <span className="tb-tool-label">Puntos 1/10</span>
         </button>
+
+        <button
+          id="btn-reference-spots"
+          onClick={onToggleReferenceSpots}
+          title="Puntos de referencia UMB en el paño (pie 71 cm, cabecera 71 cm, salidas ±18.5 cm y centro)"
+          className={`tb-tool${showReferenceSpots ? ' active' : ''}`}
+          style={{ minWidth: 64 }}
+        >
+          <Target size={15} strokeWidth={2.2} />
+          <span className="tb-tool-label">Puntos Ref.</span>
+        </button>
       </div>
 
       {/* ── Section: Movie / Animation ── */}
@@ -384,6 +398,16 @@ export default function Toolbar({
         >
           <Download size={14} strokeWidth={2.1} />
           <span style={{ fontSize: 12 }}>PNG Rápido</span>
+        </button>
+
+        <button
+          id="btn-help"
+          onClick={onOpenHelpModal}
+          className="tb-ghost"
+          title="Abrir Guía Rápida"
+        >
+          <HelpCircle size={14} strokeWidth={2.1} />
+          <span style={{ fontSize: 12 }}>Ayuda</span>
         </button>
       </div>
 
